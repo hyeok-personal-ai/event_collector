@@ -48,10 +48,11 @@ class Fetcher:
                     url = urljoin(url, r.headers.get('location', ''))
                     continue
                 chunks, size = [], 0
+                max_bytes=8_000_000 if urlsplit(url).hostname in ('keit.re.kr','www.keit.re.kr') else 3_000_000
                 async for block in r.aiter_bytes():
                     size += len(block)
-                    if size > 3_000_000:
-                        raise ValueError('페이지가 너무 큽니다. 3 MB 제한을 초과했습니다.')
+                    if size > max_bytes:
+                        raise ValueError(f'페이지가 너무 큽니다. {max_bytes//1_000_000} MB 제한을 초과했습니다.')
                     chunks.append(block)
                 # aiter_bytes has already decoded compression. Do not decode a second time.
                 headers = {k: v for k, v in r.headers.items() if k.lower() not in ('content-encoding', 'content-length')}
@@ -119,7 +120,10 @@ def parse_page(html, url, previous, observation=None):
     e['eligibility_target'] = ' / '.join(participant_sections)[:1500]
     description = soup.select_one('meta[property="og:description"],meta[name="description"]')
     title = soup.select_one('meta[property="og:title"]')
-    if structured.get('name'):
+    board_title=soup.select_one('h2.title') if urlsplit(url).hostname in ('keit.re.kr','www.keit.re.kr') and 'act=view' in urlsplit(url).query else None
+    if board_title:
+        e['title']=board_title.get_text(' ',strip=True)[:200]
+    elif structured.get('name'):
         e['title'] = str(structured['name'])[:300]
     elif title and title.get('content'):
         e['title'] = title['content'][:300]

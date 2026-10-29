@@ -35,6 +35,14 @@ class PublicCollectorTests(unittest.TestCase):
     def test_tracking_does_not_duplicate_event(self):
         self.assertEqual(canonical('https://www.meetup.com/awskrug/events/123/?eventOrigin=group'),'https://www.meetup.com/awskrug/events/123')
 
+    def test_keit_detail_heading_overrides_generic_site_title(self):
+        from app.collector import parse_page
+        from app.core import new_event
+        url='https://www.keit.re.kr/board.es?act=view&list_no=123'
+        event,_=parse_page('<title>목록 | 공지사항</title><h2 class="title">AI 솔루션 챌린지 공고</h2><p>참여 안내</p>',url,new_event(url,'AI challenge'))
+        self.assertEqual(event['title'],'AI 솔루션 챌린지 공고')
+        self.assertNotEqual(event['status'],'OPEN')
+
     def test_unapproved_destination_is_rejected_before_reading_secret(self):
         from app import cloud_batch
         with patch.object(cloud_batch,'SITE','https://example.com'),patch.object(cloud_batch,'read_key') as key:
