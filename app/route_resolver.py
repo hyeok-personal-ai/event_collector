@@ -85,6 +85,37 @@ def needs_alternative(result, event):
             bool(result.get('failure_count') and event.get('_queue_failures', 0) >= 2))
 
 
+async def verify_manual(event,fetcher,renderer,verify_page):
+    route=event['_manual_route'];url=canonical(route['url']);proof=canonical(route['proof_url'])
+    attempts=[]
+    try:
+        # Owner attests this exact proof page, not its entire host. When separate,
+        # the proof must still contain the candidate's exact link.
+        if proof!=url:
+            response=await fetcher.page(proof)
+            if response.status_code!=200:raise ValueError('공식 근거 페이지 접근 실패')
+            soup=BeautifulSoup(response.text,'html.parser')
+            links=set()
+            for a in soup.select('a[href]'):
+                try:links.add(canonical(urljoin(str(response.url),a['href'])))
+                except ValueError:pass
+            if url not in links:raise ValueError('공식 근거 페이지에서 대체 주소로 연결되는 링크 미확인')
+        fresh,raw=await verify_page(new_event(url),fetcher,renderer)
+        if fresh.get('failure_count') or fresh.get('status')=='DEAD':raise ValueError(fresh.get('evidence','대체 페이지 접근 실패'))
+        if not same_event(event,fresh):raise ValueError('행사명·회차·독립적으로 읽은 날짜 일치 미확인')
+        for key in ('id','created_at','saved','provenance','activity_type'):
+            if key in event:fresh[key]=event[key]
+        reason='소유자가 지정한 공식 근거 및 동일 행사·일정 검증 완료'
+        fresh.update(canonical_url=event['canonical_url'],verification_url=url,
+                     collection_route=routing(event,'alternate',url,proof,reason,[dict(url=url,outcome='confirmed',reason=reason)]))
+        return fresh,raw
+    except Exception as exc:
+        reason=('대체 원문 점검 필요: '+str(exc))[:200]
+        attempts.append(dict(url=url,outcome='unavailable',reason=reason))
+        return {**event,'status':'CHECK_REQUIRED','failure_count':1,'last_checked_at':iso_now(),'evidence':reason,
+                'collection_route':routing(event,'review',reason=reason,attempts=attempts)},''
+
+
 async def resolve(event, fetcher, renderer, verify_page, initial, prior_attempts=None):
     original = event['canonical_url']
     attempts = list(prior_attempts or [])

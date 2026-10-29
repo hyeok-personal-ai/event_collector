@@ -307,6 +307,9 @@ ALTERNATIVE_ROUTES=json.loads((Path(__file__).parent/'alternative-sources.json')
 
 async def verify(event, fetcher, renderer=None):
     from .route_resolver import resolve, routing, needs_alternative
+    if event.get('_manual_route'):
+        from .route_resolver import verify_manual
+        return await verify_manual(event,fetcher,renderer,_verify_page)
     route=next((r for r in ALTERNATIVE_ROUTES if canonical(r['original_url'])==canonical(event['canonical_url'])),None)
     if not route:
         previous=event.get('collection_route') or {}

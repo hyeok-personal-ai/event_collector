@@ -80,6 +80,25 @@ class RouteResolverTests(unittest.TestCase):
         self.assertEqual(r['collection_route']['state'],'review')
         self.assertNotIn(ORIGINAL,f.seen)
 
+    def test_manual_route_overrides_review_and_preserves_identity(self):
+        event={**self.event,'_manual_route':{'url':ALTERNATE,'proof_url':ALTERNATE}}
+        f=Fetcher();r=self.check(f,event)
+        self.assertEqual(r['collection_route']['state'],'alternate')
+        self.assertEqual(r['id'],event['id'])
+        self.assertNotIn(ORIGINAL,f.seen)
+
+    def test_manual_wrong_event_returns_review(self):
+        event={**self.event,'_manual_route':{'url':ALTERNATE,'proof_url':ALTERNATE}}
+        r=self.check(Fetcher(year=2026),event)
+        self.assertEqual(r['collection_route']['state'],'review')
+        self.assertTrue(r['failure_count'])
+
+    def test_manual_proof_requires_actual_link(self):
+        event={**self.event,'_manual_route':{'url':ALTERNATE,'proof_url':PROOF}}
+        r=self.check(Fetcher(),event)
+        self.assertEqual(r['collection_route']['state'],'review')
+        self.assertIn('연결되는 링크',r['evidence'])
+
     def test_dates_must_be_independent(self):
         self.assertFalse(same_event(self.event,{'title':TITLE}))
         self.assertFalse(same_event(self.event,{'title':TITLE+' 2','start_at':'2027-01-15'}))
