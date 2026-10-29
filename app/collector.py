@@ -48,7 +48,7 @@ class Fetcher:
                     url = urljoin(url, r.headers.get('location', ''))
                     continue
                 chunks, size = [], 0
-                max_bytes=8_000_000 if urlsplit(url).hostname in ('keit.re.kr','www.keit.re.kr') else 3_000_000
+                max_bytes=8_000_000 if urlsplit(url).hostname in ('keit.re.kr','www.keit.re.kr','lablab.ai','www.lablab.ai') else 3_000_000
                 async for block in r.aiter_bytes():
                     size += len(block)
                     if size > max_bytes:
@@ -81,7 +81,13 @@ class Fetcher:
         host = urlsplit(url).hostname
         lock = self.locks.setdefault(host, asyncio.Lock())
         async with lock:
-            response = await self.request(url, respect_robots=True)
+            for attempt in range(2):
+                try:
+                    response = await self.request(url, respect_robots=True)
+                    break
+                except httpx.TimeoutException:
+                    if attempt:raise
+                    await asyncio.sleep(1)
             await asyncio.sleep(.6)
             return response
 
@@ -129,6 +135,17 @@ def parse_page(html, url, previous, observation=None):
         e['title'] = title['content'][:300]
     elif soup.title and soup.title.string:
         e['title'] = soup.title.string[:300]
+    if urlsplit(url).hostname=='cs.kaist.ac.kr' and re.search(r'(?:^|&)id=\d+(?:&|$)',urlsplit(url).query):
+        label=soup.find('strong',string=re.compile(r'^Title$'))
+        if label and label.parent.find_next_sibling('p'):
+            e['title']=label.parent.find_next_sibling('p').get_text(' ',strip=True)[:200]
+        date_match=re.search(r'\bOn\s+\w+\s+([A-Za-z]+ \d{1,2}, \d{4})',text)
+        if date_match:
+            from datetime import datetime
+            try:
+                day=datetime.strptime(date_match[1],'%B %d, %Y').date().isoformat()
+                e['start_at']=day;e['end_at']=day
+            except ValueError:pass
     if len(e['title']) > 90 and previous.get('title') and previous['title'] != urlsplit(url).hostname:
         e['title'] = previous['title']
     if description and description.get('content'):
@@ -259,9 +276,9 @@ async def verify(event, fetcher, renderer=None):
             e=site_markers(e,html)
             known_dynamic=any((urlsplit(e['canonical_url']).hostname or '').endswith(h) for h in ('event-us.kr','holaworld.io','daker.ai','meetup.com','letspl.me','ticketa.co','partiful.com'))
             expired=(parse_date(e.get('apply_deadline'),True) or now())<now() if e.get('apply_deadline') else False
-            if renderer and not expired and (e['status']=='CHECK_REQUIRED' or (known_dynamic and e['status'] not in ('DEAD','SOLD_OUT'))):
+            if renderer and not expired and known_dynamic and e['status'] not in ('CLOSED','DEAD','SOLD_OUT'):
                 try:
-                    page=await renderer.render(e['canonical_url'])
+                    page=await asyncio.wait_for(renderer.render(e['canonical_url']),timeout=25)
                     if page['http_status'] and page['http_status']>=400:
                         raise ValueError(f'브라우저 접속 HTTP {page["http_status"]}')
                     if re.search(r'Just a moment|Checking your browser|Access denied|보안 확인',page.get('title',''),re.I):

@@ -1,3 +1,4 @@
+from urllib.parse import urlsplit
 """Ephemeral runner: all queue state and leases live in the hosted D1 database."""
 import argparse
 import asyncio
@@ -65,9 +66,11 @@ async def collect(force=False, verify_limit=1000, dynamic_budget=64, time_budget
             await queue.call('progress',token=token,run=run)
             await queue.call('prepare',token=token)
             sem=asyncio.Semaphore(6)
+            host_locks={}
             async def check(item):
                 nonlocal failures
-                async with sem:
+                host=urlsplit(item['event']['canonical_url']).hostname
+                async with sem, host_locks.setdefault(host,asyncio.Lock()):
                     e=new_event(**{'url':item['event']['canonical_url'],**{k:v for k,v in item['event'].items() if k!='canonical_url'}})
                     try:
                         result,_=await asyncio.wait_for(verify(e,fetcher,renderer),timeout=max(1,min(60,deadline-time.monotonic())))

@@ -124,7 +124,15 @@ SOURCES += [
 def catalog():
     return [{**asdict(s),'replacements':list(s.replacements)} for s in SOURCES]
 
+def excluded_candidate_url(url):
+    p=urlsplit(url)
+    return ((p.hostname=='redis.io' and p.path.startswith('/resources/videos/')) or
+            (p.hostname=='cs.kaist.ac.kr' and p.path=='/colloquium/info.php' and not re.search(r'(?:^|&)id=\d+(?:&|$)',p.query)) or
+            (p.hostname=='events.linuxfoundation.org' and re.fullmatch(r'/cncf-project-colo-guidelines-\d{4}/?',p.path)))
+
+
 def source_match(url,source):
+    if excluded_candidate_url(url):return False
     parsed=urlsplit(url)
     host=(parsed.hostname or '').removeprefix('www.')
     target=host+parsed.path+('?' + parsed.query if source.match_query and parsed.query else '')

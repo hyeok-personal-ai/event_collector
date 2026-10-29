@@ -3,7 +3,7 @@ PUBLIC_FIELDS=('canonical_url','title','summary','categories','activity_type','s
 LIMITS={'title':200,'summary':700,'source':100,'organizer':150,'location':250,'price':100,'target':1500,'eligibility_target':1500,'tech_stack':300,'evidence':1000}
 
 def public_event(event):
-    return {k:(event[k][:LIMITS[k]] if k in LIMITS and isinstance(event[k],str) else event[k]) for k in PUBLIC_FIELDS if k in event}
+    return {k:(event[k].encode("utf-16-le")[:LIMITS[k]*2].decode("utf-16-le",errors="ignore") if k in LIMITS and isinstance(event[k],str) else event[k]) for k in PUBLIC_FIELDS if k in event}
 
 def preserve_club_status(event):
     if event.get('activity_type')=='club' and event.get('status') in ('OPEN','WAITLIST') and not event.get('apply_deadline'):
