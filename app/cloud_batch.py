@@ -36,14 +36,14 @@ class RemoteQueue:
 
 
 async def collect(force=False, verify_limit=80, dynamic_budget=24):
-    if not SITE.startswith('https://'):
-        raise RuntimeError('RADAR_SITE_URL must be configured with an HTTPS backend')
+    if SITE != 'https://tech-event-radar-kr.qkdrhkgn123.chatgpt.site':
+        raise RuntimeError('RADAR_SITE_URL must match the approved Radar backend')
     run_id = os.environ.get('GITHUB_RUN_ID')
     repo = os.environ.get('GITHUB_REPOSITORY')
-    if repo != 'hyeok-personal-ai/event_collector' or not run_id or not run_id.isdigit():
+    if repo != 'hyeok-personal-ai/event_collector' or os.environ.get('GITHUB_REF') != 'refs/heads/main' or not run_id or not run_id.isdigit():
         raise RuntimeError('Cloud collection must run from the configured GitHub Actions repository')
     token = 'gha-'+run_id+'-'+os.environ.get('GITHUB_RUN_ATTEMPT','1')+'-'+uuid.uuid4().hex[:8]
-    async with httpx.AsyncClient(headers={'Authorization':'Bearer '+read_key()},timeout=45,follow_redirects=False) as client:
+    async with httpx.AsyncClient(headers={'Authorization':'Bearer '+read_key()},timeout=45,follow_redirects=False,trust_env=False) as client:
         queue=RemoteQueue(client)
         started=await queue.call('start',token=token,force=force,run_url=f'https://github.com/{repo}/actions/runs/{run_id}')
         if started['state']!='started':return started

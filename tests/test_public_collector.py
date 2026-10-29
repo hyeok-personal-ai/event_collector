@@ -1,4 +1,5 @@
 import os
+import asyncio
 import unittest
 from unittest.mock import patch
 from app.sources import SOURCES, extract_links
@@ -33,5 +34,17 @@ class PublicCollectorTests(unittest.TestCase):
 
     def test_tracking_does_not_duplicate_event(self):
         self.assertEqual(canonical('https://www.meetup.com/awskrug/events/123/?eventOrigin=group'),'https://www.meetup.com/awskrug/events/123')
+
+    def test_unapproved_destination_is_rejected_before_reading_secret(self):
+        from app import cloud_batch
+        with patch.object(cloud_batch,'SITE','https://example.com'),patch.object(cloud_batch,'read_key') as key:
+            with self.assertRaises(RuntimeError):asyncio.run(cloud_batch.collect())
+            key.assert_not_called()
+
+    def test_non_main_branch_is_rejected_before_reading_secret(self):
+        from app import cloud_batch
+        with patch.object(cloud_batch,'SITE','https://tech-event-radar-kr.qkdrhkgn123.chatgpt.site'),patch.dict(os.environ,{'GITHUB_REPOSITORY':'hyeok-personal-ai/event_collector','GITHUB_RUN_ID':'123','GITHUB_REF':'refs/heads/other'}),patch.object(cloud_batch,'read_key') as key:
+            with self.assertRaises(RuntimeError):asyncio.run(cloud_batch.collect())
+            key.assert_not_called()
 
 if __name__=='__main__':unittest.main()
