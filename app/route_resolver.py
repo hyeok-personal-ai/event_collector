@@ -15,9 +15,9 @@ def official_hosts():
     # Multi-tenant listing platforms are deliberately excluded, even when the
     # catalog's label describes an official organization using that platform.
     from .sources import SOURCES
-    shared = {'luma.com', 'meetup.com', 'www.meetup.com', 'event-us.kr', 'github.com'}
+    shared = {'luma.com', 'meetup.com', 'www.meetup.com', 'event-us.kr', 'github.com', 'ocgroups.dev', 'discuss.pytorch.kr'}
     hosts = {urlsplit(s.url).hostname for s in SOURCES
-             if (s.group == '기업 공식' or s.club or s.id in ('university', 'cncf', 'pycon', 'pytorch'))}
+             if (s.group == '기업 공식' or s.club or s.id in ('university', 'pycon'))}
     return (hosts - shared) | {'awskr.org', 'cday2026.awskr.org', 'nasaspaceappskr.org',
                              'www.spaceappschallenge.org', 'www.dimoa.co.kr'}
 
