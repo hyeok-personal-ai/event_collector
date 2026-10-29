@@ -1,5 +1,5 @@
 """Only public event facts may cross the collector boundary."""
-PUBLIC_FIELDS=('canonical_url','title','summary','categories','activity_type','status','apply_deadline','start_at','end_at','last_verified_at','source','organizer','location','price','target','eligibility_target','tech_stack','evidence','application_url')
+PUBLIC_FIELDS=('canonical_url','title','summary','categories','activity_type','status','apply_deadline','start_at','end_at','last_verified_at','source','organizer','location','price','target','eligibility_target','tech_stack','evidence','application_url','verification_url')
 LIMITS={'title':200,'summary':700,'source':100,'organizer':150,'location':250,'price':100,'target':1500,'eligibility_target':1500,'tech_stack':300,'evidence':1000}
 
 def public_event(event):

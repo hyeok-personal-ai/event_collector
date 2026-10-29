@@ -1,0 +1,43 @@
+[
+  {
+    "original_url": "https://cday2026.awskr.org/",
+    "url": "https://event-us.kr/awskrug/event/137627",
+    "name": "AWS Community Day Seoul 2026",
+    "provider": "AWSKRUG 공식 이벤터스 행사",
+    "mode": "alternate",
+    "markers": [
+      "aws community day",
+      "2026",
+      "awskrug"
+    ],
+    "reason": "원래 행사 사이트 robots 응답 403. 주최자·행사명·2026년 일정이 일치하는 공식 신청 페이지로 전환."
+  },
+  {
+    "original_url": "https://www.spaceappschallenge.org/2026/local-events/seoul",
+    "url": "https://nasaspaceappskr.org/2026/",
+    "name": "NASA Space Apps Seoul 2026",
+    "provider": "NASA Space Apps 서울 운영팀",
+    "mode": "alternate",
+    "markers": [
+      "nasa",
+      "space apps",
+      "2026",
+      "seoul"
+    ],
+    "informational_only": true,
+    "reason": "글로벌 사이트 TLS 오류. 서울 운영팀 공식 2026 행사 안내에서 수집. 글로벌 참가 등록 상태는 별도 확인 필요."
+  },
+  {
+    "original_url": "https://www.rocketpunch.com/event?eventId=cZlwtO40G0",
+    "url": null,
+    "name": "생산성부터 보안, AI까지 다루는 12주 릴레이 웨비나",
+    "provider": "디모아 / Microsoft",
+    "mode": "review",
+    "markers": [],
+    "reason": "동일 행사의 접근 가능한 공식 대체 원문 미확인. 디모아·Pickcl 공식 안내를 조사했으나 다른 행사를 대체하지 않음. 반복 수집 중지·수동 점검 대기.",
+    "review_urls": [
+      "https://www.dimoa.co.kr/Story/News",
+      "https://www.pickcl.com/partner/seminar_event/"
+    ]
+  }
+]

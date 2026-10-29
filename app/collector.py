@@ -246,7 +246,7 @@ def store_raw(html):
     if not target.exists():target.write_bytes(gzip.compress(html.encode('utf-8')))
     return str(target.relative_to(folder.parent))
 
-async def verify(event, fetcher, renderer=None):
+async def _verify_page(event, fetcher, renderer=None):
     e = dict(event)
     e.pop('browser_error',None)
     if e.get('needs_recheck') and e.get('discovered_deadline'):
@@ -299,3 +299,24 @@ async def verify(event, fetcher, renderer=None):
         raw = ''
     e['last_checked_at'] = iso_now()
     return e, raw
+
+
+ALTERNATIVE_ROUTES=json.loads((Path(__file__).parent/'alternative-sources.json').read_text(encoding='utf-8'))
+
+async def verify(event, fetcher, renderer=None):
+    route=next((r for r in ALTERNATIVE_ROUTES if canonical(r['original_url'])==canonical(event['canonical_url'])),None)
+    if not route:return await _verify_page(event,fetcher,renderer)
+    if route['mode']=='review':
+        return {**event,'status':'CHECK_REQUIRED','failure_count':1,'evidence':'대체 원문 점검 필요: '+route['reason']},''
+    original=event['canonical_url']
+    candidate={**event,'canonical_url':route['url'],'status':'CHECK_REQUIRED','last_verified_at':None}
+    result,raw=await _verify_page(candidate,fetcher,renderer)
+    text=' '.join((result.get('title','')+' '+raw).lower().split())
+    if result.get('failure_count') or not all(m in text for m in route['markers']):
+        return {**event,'status':'CHECK_REQUIRED','failure_count':1,'evidence':'대체 원문 점검 필요: '+route['provider']+' / '+(result.get('evidence','') if result.get('failure_count') else '동일 행사 식별 문구 미확인')},raw
+    result.update(canonical_url=original,verification_url=route['url'],source=route['provider'])
+    result['evidence']='공식 대체 원문 확인: '+route['url']+' / '+result['evidence']
+    if route.get('informational_only') and result['status'] not in ('CLOSED','DEAD','SOLD_OUT'):
+        result['status']='CHECK_REQUIRED'
+        result['evidence']+=' / 서울 행사 안내 확인. 글로벌 등록 사이트의 신청 가능 여부는 확인하지 못했습니다.'
+    return result,raw
