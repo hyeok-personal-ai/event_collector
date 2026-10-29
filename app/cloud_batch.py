@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import uuid
+import time
 
 import httpx
 from .batch_common import public_event, preserve_club_status
@@ -35,7 +36,7 @@ class RemoteQueue:
                 await asyncio.sleep(2**attempt)
 
 
-async def collect(force=False, verify_limit=80, dynamic_budget=24):
+async def collect(force=False, verify_limit=1000, dynamic_budget=64, time_budget=1800):
     if SITE != 'https://tech-event-radar-kr.qkdrhkgn123.chatgpt.site':
         raise RuntimeError('RADAR_SITE_URL must match the approved Radar backend')
     run_id = os.environ.get('GITHUB_RUN_ID')
@@ -50,6 +51,8 @@ async def collect(force=False, verify_limit=80, dynamic_budget=24):
         run=started['run']
         fetcher=Fetcher();renderer=BrowserRenderer(fetcher,budget=dynamic_budget) if dynamic_budget else None
         failures=0
+        attempted=0
+        deadline=time.monotonic()+time_budget
         try:
             def record(result):
                 run['sources'].append(result)
@@ -59,14 +62,14 @@ async def collect(force=False, verify_limit=80, dynamic_budget=24):
             for start in range(0,len(candidates),40):
                 await queue.call('enqueue',token=token,items=[{'event':public_event(e),'priority':20 if e.get('activity_type')=='club' else 0} for e in candidates[start:start+40]])
             await queue.call('progress',token=token,run=run)
-            selected=(await queue.call('claim',token=token,limit=verify_limit))['items']
-            sem=asyncio.Semaphore(3)
+            await queue.call('prepare',token=token)
+            sem=asyncio.Semaphore(6)
             async def check(item):
                 nonlocal failures
                 async with sem:
                     e=new_event(**{'url':item['event']['canonical_url'],**{k:v for k,v in item['event'].items() if k!='canonical_url'}})
                     try:
-                        result,_=await asyncio.wait_for(verify(e,fetcher,renderer),timeout=75)
+                        result,_=await asyncio.wait_for(verify(e,fetcher,renderer),timeout=max(1,min(60,deadline-time.monotonic())))
                         if e.get('activity_type')=='club':result['activity_type']='club'
                         result=preserve_club_status(result)
                         if result.get('failure_count'):
@@ -77,12 +80,23 @@ async def collect(force=False, verify_limit=80, dynamic_budget=24):
                         failures+=1
                         await queue.call('fail',token=token,id=item['id'],error=(type(exc).__name__+': '+str(exc))[:350])
                         print(json.dumps({'verification_failed':item['id'],'type':type(exc).__name__}),flush=True)
-            # Complete the workers before releasing the run lease, even if one API call fails.
-            outcomes=await asyncio.gather(*(check(item) for item in selected),return_exceptions=True)
-            errors=[e for e in outcomes if isinstance(e,Exception)]
-            if errors:raise errors[0]
-            run['state']='partial' if failures or any(s['state'] not in ('ok','disabled') for s in run['sources']) else 'completed'
-            if failures:run['error']=f'원문 검증 실패 {failures}건 · 대기열에서 다음 날 재시도'
+            batch=0
+            while attempted<verify_limit and time.monotonic()<deadline-10:
+                selected=(await queue.call('claim',token=token,batch=batch,limit=min(40,verify_limit-attempted)))['items']
+                if not selected:break
+                outcomes=await asyncio.gather(*(check(item) for item in selected),return_exceptions=True)
+                errors=[e for e in outcomes if isinstance(e,Exception)]
+                if errors:raise errors[0]
+                attempted+=len(selected);batch+=1
+                run['attempted']=attempted
+                await queue.call('progress',token=token,run=run)
+            remaining=(await queue.call('prepare',token=token))['stats']
+            run['deferred']=remaining['due']
+            run['state']='partial' if failures or remaining['due'] or any(s['state'] not in ('ok','disabled') for s in run['sources']) else 'completed'
+            messages=[]
+            if failures:messages.append(f'원문 검증 실패 {failures}건 · 원인별 지연 재시도/점검 대기')
+            if remaining['due']:messages.append(f"실행 예산 내 미처리 {remaining['due']}건 · 다음 배치 우선순위 유지")
+            if messages:run['error']=' / '.join(messages)
         except Exception as exc:
             run.update(state='failed',error=(type(exc).__name__+': '+str(exc))[:350])
         finally:
