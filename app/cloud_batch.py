@@ -36,7 +36,7 @@ class RemoteQueue:
                 await asyncio.sleep(2**attempt)
 
 
-async def collect(force=False, verify_limit=1000, dynamic_budget=64, time_budget=1800):
+async def collect(force=False, verify_limit=1000, dynamic_budget=64, time_budget=1800, cleanup_timeout=15):
     if SITE != 'https://tech-event-radar-kr.qkdrhkgn123.chatgpt.site':
         raise RuntimeError('RADAR_SITE_URL must match the approved Radar backend')
     run_id = os.environ.get('GITHUB_RUN_ID')
@@ -50,6 +50,7 @@ async def collect(force=False, verify_limit=1000, dynamic_budget=64, time_budget
         if started['state']!='started':return started
         run=started['run']
         fetcher=Fetcher();renderer=BrowserRenderer(fetcher,budget=dynamic_budget) if dynamic_budget else None
+        cleanup_failed=False
         failures=0
         attempted=0
         deadline=time.monotonic()+time_budget
@@ -100,11 +101,17 @@ async def collect(force=False, verify_limit=1000, dynamic_budget=64, time_budget
         except Exception as exc:
             run.update(state='failed',error=(type(exc).__name__+': '+str(exc))[:350])
         finally:
-            if renderer:await renderer.close()
+            if renderer:
+                try:
+                    await asyncio.wait_for(renderer.close(),timeout=cleanup_timeout)
+                except Exception as exc:
+                    cleanup_failed=True
+                    if run['state']!='failed':run['state']='partial'
+                    run['error']=((run.get('error') or '')+' / 브라우저 종료 실패: '+type(exc).__name__).strip(' /')
             await fetcher.close()
             run['finished_at']=iso_now()
             await queue.call('finish',token=token,run=run)
-        return {k:run.get(k) for k in ('run_id','state','discovered','verified','error','run_url')}
+        return {**{k:run.get(k) for k in ('run_id','state','discovered','verified','error','run_url')},'cleanup_failed':cleanup_failed}
 
 
 def main():
@@ -113,6 +120,10 @@ def main():
     args=parser.parse_args()
     result=asyncio.run(collect(args.force))
     print(json.dumps(result,ensure_ascii=False),flush=True)
+    if result.get('cleanup_failed'):
+        # Dedicated GitHub CLI only: results are persisted and stdout flushed above.
+        # A stuck Playwright executor must not hold Python's interpreter shutdown.
+        os._exit(1)
     if result.get('state')=='failed':raise SystemExit(1)
 
 
