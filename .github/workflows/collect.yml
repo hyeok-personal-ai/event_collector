@@ -1,0 +1,51 @@
+name: Daily tech event collection
+on:
+  schedule:
+    - cron: '17 0 * * *' # 09:17 Asia/Seoul
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Run again today (still prevents overlapping collection)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: daily-collector
+  cancel-in-progress: false
+jobs:
+  collect:
+    if: github.repository == 'hyeok-personal-ai/event_collector' && vars.COLLECTION_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: /tmp/radar-playwright
+      RADAR_SITE_URL: ${{ vars.RADAR_SITE_URL }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install collector
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps chromium --only-shell
+      - name: Collect and persist to D1
+        env:
+          RADAR_BATCH_KEY: ${{ secrets.RADAR_BATCH_KEY }}
+          FORCE: ${{ inputs.force || false }}
+        run: |
+          if [ "$FORCE" = "true" ]; then
+            python -m app.cloud_batch --force
+          else
+            python -m app.cloud_batch
+          fi
+      - name: Write run summary
+        if: always()
+        run: |
+          echo '## Tech Event Radar' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Source outcomes, queue backlog and last completed run are available on the configured Radar site.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Partial source coverage is reported separately from workflow execution success.' >> "$GITHUB_STEP_SUMMARY"

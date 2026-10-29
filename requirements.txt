@@ -1,0 +1,4 @@
+httpx==0.28.1
+beautifulsoup4==4.15.0
+playwright==1.64.0
+defusedxml==0.7.1
