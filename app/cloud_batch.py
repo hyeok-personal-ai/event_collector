@@ -60,6 +60,7 @@ async def collect(force=False, verify_limit=1000, dynamic_budget=64, time_budget
                 run['sources'].append(result)
                 print(json.dumps({'source':result['id'],'state':result['state'],'count':result['count']}),flush=True)
             candidates,_=await discover(fetcher,renderer,record)
+            fetcher.route_candidates=candidates
             run['discovered']=len(candidates)
             for start in range(0,len(candidates),40):
                 await queue.call('enqueue',token=token,items=[{'event':public_event(e),'priority':20 if e.get('activity_type')=='club' else 0} for e in candidates[start:start+40]])
@@ -72,8 +73,9 @@ async def collect(force=False, verify_limit=1000, dynamic_budget=64, time_budget
                 host=urlsplit(item['event']['canonical_url']).hostname
                 async with sem, host_locks.setdefault(host,asyncio.Lock()):
                     e=new_event(**{'url':item['event']['canonical_url'],**{k:v for k,v in item['event'].items() if k!='canonical_url'}})
+                    result=None
                     try:
-                        result,_=await asyncio.wait_for(verify(e,fetcher,renderer),timeout=max(1,min(60,deadline-time.monotonic())))
+                        result,_=await asyncio.wait_for(verify(e,fetcher,renderer),timeout=max(1,min(105,deadline-time.monotonic())))
                         if e.get('activity_type')=='club':result['activity_type']='club'
                         result=preserve_club_status(result)
                         if result.get('failure_count'):
@@ -82,7 +84,10 @@ async def collect(force=False, verify_limit=1000, dynamic_budget=64, time_budget
                         run['verified']+=1
                     except Exception as exc:
                         failures+=1
-                        await queue.call('fail',token=token,id=item['id'],error=(type(exc).__name__+': '+str(exc))[:350])
+                        payload={'reported_at':iso_now()}
+                        if result and result.get('collection_route'):
+                            payload={'route':result['collection_route'],'reported_at':iso_now()}
+                        await queue.call('fail',token=token,id=item['id'],error=(type(exc).__name__+': '+str(exc))[:350],**payload)
                         print(json.dumps({'verification_failed':item['id'],'type':type(exc).__name__}),flush=True)
             batch=0
             while attempted<verify_limit and time.monotonic()<deadline-10:

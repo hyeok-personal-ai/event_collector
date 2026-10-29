@@ -89,6 +89,8 @@ class Fetcher:
                     if attempt:raise
                     await asyncio.sleep(1)
             await asyncio.sleep(.6)
+            from .route_resolver import observe
+            observe(self, response)
             return response
 
 def json_nodes(value):
@@ -304,17 +306,28 @@ async def _verify_page(event, fetcher, renderer=None):
 ALTERNATIVE_ROUTES=json.loads((Path(__file__).parent/'alternative-sources.json').read_text(encoding='utf-8'))
 
 async def verify(event, fetcher, renderer=None):
+    from .route_resolver import resolve, routing, needs_alternative
     route=next((r for r in ALTERNATIVE_ROUTES if canonical(r['original_url'])==canonical(event['canonical_url'])),None)
-    if not route:return await _verify_page(event,fetcher,renderer)
+    if not route:
+        previous=event.get('collection_route') or {}
+        if previous.get('state')=='alternate':
+            return await resolve(event,fetcher,renderer,_verify_page,event)
+        result,raw=await _verify_page(event,fetcher,renderer)
+        if needs_alternative(result,event):
+            return await resolve(event,fetcher,renderer,_verify_page,result)
+        result['collection_route']=routing(event,'direct',event['canonical_url'],reason='등록 원문 확인' if not result.get('failure_count') else '일시적 오류 · 지연 재시도')
+        return result,raw
     if route['mode']=='review':
-        return {**event,'status':'CHECK_REQUIRED','failure_count':1,'evidence':'대체 원문 점검 필요: '+route['reason']},''
+        return {**event,'status':'CHECK_REQUIRED','failure_count':1,'evidence':'대체 원문 점검 필요: '+route['reason'],
+                'collection_route':routing(event,'review',reason=route['reason'])},''
     original=event['canonical_url']
     candidate={**event,'canonical_url':route['url'],'status':'CHECK_REQUIRED','last_verified_at':None}
     result,raw=await _verify_page(candidate,fetcher,renderer)
     text=' '.join((result.get('title','')+' '+raw).lower().split())
     if result.get('failure_count') or not all(m in text for m in route['markers']):
-        return {**event,'status':'CHECK_REQUIRED','failure_count':1,'evidence':'대체 원문 점검 필요: '+route['provider']+' / '+(result.get('evidence','') if result.get('failure_count') else '동일 행사 식별 문구 미확인')},raw
+        return await resolve(event,fetcher,renderer,_verify_page,result,[dict(url=route['url'],outcome='unavailable' if result.get('failure_count') else 'mismatch',reason='등록 대체 원문의 접근 또는 행사 식별 실패')])
     result.update(canonical_url=original,verification_url=route['url'],source=route['provider'])
+    result['collection_route']=routing(event,'alternate',route['url'],route['url'],route['reason'],[dict(url=route['url'],outcome='confirmed',reason='사전 검토한 공식 경로 · 행사 식별 문구 재확인')])
     result['evidence']='공식 대체 원문 확인: '+route['url']+' / '+result['evidence']
     if route.get('informational_only') and result['status'] not in ('CLOSED','DEAD','SOLD_OUT'):
         result['status']='CHECK_REQUIRED'
