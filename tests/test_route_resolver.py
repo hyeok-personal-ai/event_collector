@@ -49,6 +49,7 @@ class RouteResolverTests(unittest.TestCase):
     def test_blocked_original_switches_with_official_outgoing_link(self):
         f=Fetcher();r=self.check(f)
         self.assertEqual(r['canonical_url'],ORIGINAL)
+        self.assertEqual(r['id'],self.event['id'])
         self.assertEqual(r['verification_url'],ALTERNATE)
         self.assertEqual(r['collection_route']['proof_url'],PROOF)
         self.assertEqual(r['collection_route']['state'],'alternate')

@@ -141,6 +141,9 @@ async def resolve(event, fetcher, renderer, verify_page, initial, prior_attempts
                 attempts.append(dict(url=url, outcome='mismatch', reason='행사명·회차·독립적으로 읽은 날짜의 일치 미확인'))
                 continue
             attempts.append(dict(url=url, outcome='confirmed', reason='공식 경로 연결 및 행사명·일정 일치 확인'))
+            for key in ('id','created_at','saved','provenance'):
+                if key in event:
+                    fresh[key]=event[key]
             fresh.update(canonical_url=original, verification_url=url, source=urlsplit(url).hostname,
                          activity_type=event.get('activity_type', 'conference'),
                          collection_route=routing(event, 'alternate', url, proof, '공식 페이지와의 연결 및 행사명·일정 일치 확인', attempts))
