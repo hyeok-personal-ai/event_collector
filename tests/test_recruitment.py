@@ -18,6 +18,11 @@ class RecruitmentTests(unittest.TestCase):
             result=recruitment_facts(e,html)
         self.assertEqual(result['apply_deadline'],'2026-11-06T23:59:59+09:00')
         self.assertEqual(result['status'],'CLOSED')
+        crawler_html='<main><h1>동아리 모집</h1><div><time datetime="2026-11-03T16:01:55.448Z">작성일</time></div><p>📩 모집 기간: 10/26(월) ~ 11.06(금)</p></main>'
+        with patch('app.recruitment.now',return_value=datetime(2026,11,10,tzinfo=KST)):
+            result=recruitment_facts(e,crawler_html)
+        self.assertEqual(result['apply_deadline'],'2026-11-06T23:59:59+09:00')
+        self.assertEqual(result['status'],'CLOSED')
         # A known deadline must also win when the page has no parseable range.
         with patch('app.recruitment.now',return_value=datetime(2026,11,10,tzinfo=KST)):
             result=recruitment_facts({**e,'apply_deadline':'2026-11-06'},'<main><button>모집중</button></main>')

@@ -46,6 +46,10 @@ def inflearn_recruitment_deadline(main):
     """
     published = main.select_one('.sub-title__created-at .sub-title__value')
     posted = None
+    # Inflearn's crawler response uses a semantic time element in the header.
+    times = main.select('time[datetime]')
+    if len(times) == 1:
+        posted = parse_date(times[0].get('datetime'))
     if published:
         match = re.fullmatch(r'(\d{2}|\d{4})\.(\d{1,2})\.(\d{1,2})\s+\d{2}:\d{2}', published.get_text(strip=True))
         if match:
