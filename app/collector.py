@@ -17,6 +17,32 @@ from .access_policy import assert_collection_allowed
 USER_AGENT = 'TechEventRadar/1.0 (+https://github.com/hyeok-personal-ai/event_collector; noncommercial)'
 DEV_EVENT_URL = 'https://raw.githubusercontent.com/brave-people/Dev-Event/master/README.md'
 
+def location_facts(structured):
+    locations=structured.get('location')
+    locations=locations if isinstance(locations,list) else [locations]
+    labels=[];countries=[];online=False;offline=False
+    for loc in locations:
+        if not isinstance(loc,dict):continue
+        if loc.get('@type')=='VirtualLocation':online=True;labels.append('온라인')
+        else:offline=True
+        if loc.get('name'):labels.append(str(loc['name']))
+        address=loc.get('address')
+        if isinstance(address,dict):
+            for key in ('addressLocality','addressRegion'):
+                if address.get(key):labels.append(str(address[key]))
+            country=address.get('addressCountry')
+            if isinstance(country,dict):country=country.get('identifier') or country.get('name')
+            if country:
+                labels.append(str(country))
+                if re.fullmatch('[A-Za-z]{2}',str(country)):countries.append(str(country).upper())
+    mode=str(structured.get('eventAttendanceMode',''))
+    if mode.endswith('MixedEventAttendanceMode'):online=offline=True
+    elif mode.endswith('OnlineEventAttendanceMode'):online=True
+    elif mode.endswith('OfflineEventAttendanceMode'):offline=True
+    if online and '온라인' not in labels:labels.insert(0,'온라인')
+    return {'location':' · '.join(dict.fromkeys(labels))[:250], 'country_code':countries[0] if len(set(countries))==1 else None,
+            'attendance_mode':'hybrid' if online and offline else 'online' if online else 'offline' if offline else 'unknown'}
+
 async def public_url(url):
     # Canonical identity can omit a trailing slash; a network redirect target cannot.
     canonical(url)
@@ -163,9 +189,9 @@ def parse_page(html, url, previous, observation=None):
     organizer = structured.get('organizer')
     if isinstance(organizer, dict):
         e['organizer'] = str(organizer.get('name') or e.get('organizer') or '')
-    location = structured.get('location')
-    if isinstance(location, dict):
-        e['location'] = str(location.get('name') or ('온라인' if location.get('@type') == 'VirtualLocation' else e.get('location') or ''))
+    if structured.get('location') or structured.get('eventAttendanceMode'):
+        facts=location_facts(structured)
+        if facts['location']:e.update(facts)
     offers = structured.get('offers') or []
     offers = [offers] if isinstance(offers, dict) else offers
     offers = [o for o in offers if isinstance(o, dict)] if isinstance(offers, list) else []

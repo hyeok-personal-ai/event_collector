@@ -16,3 +16,11 @@ class AccessPolicyTests(unittest.TestCase):
         result=public_event(e)
         self.assertNotIn('ORIGINAL',result['summary'])
         self.assertEqual(e['summary'],'ORIGINAL POST BODY')
+    def test_structured_location_preserves_country_and_virtual_mode(self):
+        from app.collector import location_facts
+        f=location_facts({'location':{'@type':'Place','name':'Coworking venue','address':{'addressLocality':'Taipei','addressCountry':{'@type':'Country','name':'TW'}}}})
+        self.assertEqual(f['country_code'],'TW')
+        self.assertIn('Taipei',f['location'])
+        self.assertEqual(location_facts({'location':{'@type':'VirtualLocation','name':'Zoom'}})['attendance_mode'],'online')
+        self.assertEqual(location_facts({'location':[{'@type':'VirtualLocation'},{'@type':'Place','name':'Seoul venue'}]})['attendance_mode'],'hybrid')
+        self.assertIsNone(location_facts({'location':{'name':'Secret venue'}})['country_code'])
