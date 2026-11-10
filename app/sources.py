@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 from .core import new_event, canonical, categories, activity_type, iso_now
 from .importers import parse_dev_event
 from .collector import DEV_EVENT_URL, json_nodes
+from .access_policy import assert_collection_allowed
 
 @dataclass(frozen=True)
 class Source:
@@ -124,8 +125,8 @@ RETIRED = {
     'pycon':('2026 공식 주소도 GitHub 서버에서 HTTP 403. 이벤터스 공개 목록으로 보완하며 파이콘 공지 전체 수집은 보장하지 않습니다.',('eventus',)),
     'onoffmix':('robots.txt에서 자동 수집 금지. 행사 범위는 이벤터스의 개별 원문으로 보완하며 온오프믹스 전체를 대신한다고 보장하지 않습니다.',('eventus',)),
     'teampik':('사이트 TLS 인증서 만료. 사이드 프로젝트 모집 목록으로 보완합니다.',('sideproject',)),
-    'wanted':('GitHub 러너에서 robots 확인 HTTP 403. 공개 개발자 행사 목록으로 보완합니다.',('eventus',)),
-    'rocketpunch':('공개 첫 화면 HTTP 403, 행사 전용 목록 확인 불가. 이벤터스의 개별 원문으로 보완합니다.',('eventus',)),
+    'wanted':('2026-08-06 약관 제19조 제2·7항의 제3자 제공 및 자동 수집 제한 확인. 허가 전 직접 수집과 검색 경유 수집을 보류합니다.',()),
+    'rocketpunch':('서비스 이용약관 제4조 제2항 제4호의 자동 수집 제한 및 제8조의 비영리 이용 제한 확인. 허가 전 수집·공개를 보류합니다.',()),
     'linkedin':('robots.txt에서 자동 수집 금지. 공개 행사·커뮤니티 원문으로 보완합니다.',('eventus',)),
     'partiful':('소개 페이지에는 행사 목록이 없고 Explore는 일반 친목 행사 중심입니다. 개발자 행사 목록으로 대체합니다.',('eventus',)),
     'disquiet':('개편된 홈은 제품·일반 게시글 중심이며 프로젝트 모집 전용 목록이 아닙니다. 실제 모집 목록으로 대체합니다.',('sideproject',)),
@@ -331,34 +332,55 @@ def club_candidates(html, url, source):
 def search_queries():
     from .core import now
     period=now().strftime('%Y년 %m월')
-    return [
-        f'{period} 개발자 행사 밋업 컨퍼런스 모집 site:event-us.kr',
-        f'{period} AI 개발자 서울 site:luma.com OR site:meetup.com OR site:ticketa.co OR site:partiful.com',
-        f'{period} 백엔드 프로젝트 모집 site:inflearn.com/projects OR site:okky.kr/articles OR site:letspl.me/project',
-        f'{period} 개발 스터디 모집 site:holaworld.io OR site:teampik.com OR site:disquiet.io',
-        f'{period} 해커톤 공모전 접수 site:dacon.io OR site:daker.ai OR site:aifactory.space OR site:hackon.kr',
-        f'{period} AI hackathon registration site:lablab.ai OR site:devpost.com',
-        f'{period} 개발자 행사 GDG AWSKRUG PyTorchKR OpenInfra CNCF PyCon',
-        f'{period} Korea developer event AWS Google Microsoft NVIDIA MongoDB Redis RedHat Oracle JetBrains OpenAI Meta',
-        f'{period} 개발자 멘토링 행사 site:wanted.co.kr OR site:programmers.co.kr OR site:jumpit.saramin.co.kr OR site:rocketpunch.com',
-        f'{period} 개발자 행사 site:linkedin.com/events',
-        f'{period} 소프트웨어 AI 해커톤 공모전 모집 site:go.kr OR site:ac.kr',
-    ]
+    # Derive queries from the active catalog, so policy changes cannot leave stale
+    # restricted targets in a second, manually maintained discovery list.
+    groups=[(('스터디·프로젝트',),'개발 스터디 프로젝트 팀원 모집'),
+            (('동아리·연합 커뮤니티',),'개발 동아리 모집 지원'),
+            (('행사 플랫폼',),'개발자 행사 밋업 컨퍼런스 모집'),
+            (('개발자 커뮤니티',),'개발자 스터디 행사 참가'),
+            (('해커톤·공모전','커리어·대회'),'소프트웨어 AI 해커톤 공모전 접수'),
+            (('기업 공식','대학 공개행사'),'developer event registration 모집')]
+    queries=[]
+    for names, words in groups:
+        hosts=[]
+        for source in SOURCES:
+            if not source.enabled or source.group not in names:continue
+            try:assert_collection_allowed(source.url)
+            except ValueError:continue
+            host=urlsplit(source.url).hostname
+            if host and host not in hosts:hosts.append(host)
+        if hosts:queries.append(f'{period} {words} ('+' OR '.join('site:'+host for host in hosts)+')')
+    return queries
+
+
+def search_candidate(result):
+    """Search discovers links; it cannot revive a disabled source or prove intake."""
+    if not isinstance(result,dict):return None
+    url=result.get('url')
+    if not isinstance(url,str):return None
+    try:
+        url=canonical(url)
+        assert_collection_allowed(url)
+        source=next((s for s in SOURCES if s.enabled and source_match(url,s)),None)
+        if source is None:return None
+        title=str(result.get('title') or '')[:180]
+        if source.keyword and not TECH.search(title):return None
+        kind='club' if source.club else 'study' if source.id=='inflearn_studies' else 'project' if source.id in ('inflearn_projects','sideproject') else activity_type(title)
+        return new_event(url,title,activity_type=kind,source=source.name,
+                         provenance='web_search',discovery_source=source.id,discovery_url=url,
+                         evidence='공개 검색에서 링크를 발견했습니다. 원문과 실제 모집 상태를 검증하기 전입니다.')
+    except (ValueError,TypeError):return None
 
 async def discover_search_api(fetcher):
     """Optional user-owned Brave key; no credential is ever returned to the UI."""
     key=os.environ.get('BRAVE_SEARCH_API_KEY')
-    if not key:return [],{'state':'agent_bridge','message':'검색은 연결된 Codex 자동 탐색에서 수행합니다. Brave 키는 선택 사항입니다.'}
+    if not key:return [],{'state':'disabled','message':'검색 API가 연결되지 않았습니다. 등록된 소스의 직접 수집만 수행하며 GPT 예약 탐색은 사용하지 않습니다.'}
     items={}
-    for query in search_queries()[:6]:
+    for query in search_queries():
         response=await fetcher.client.get('https://api.search.brave.com/res/v1/web/search',headers={'X-Subscription-Token':key},params={'q':query,'count':10})
         response.raise_for_status()
         for r in response.json().get('web',{}).get('results',[]):
-            url=r.get('url','')
-            for s in SOURCES:
-                if source_match(url,s):
-                    try:items[url]=new_event(url,r.get('title','')[:180],summary=r.get('description','')[:700],provenance='web_search')
-                    except ValueError:pass
-                    break
+            event=search_candidate(r)
+            if event:items[event['canonical_url']]=event
         await asyncio.sleep(1)
     return list(items.values()),{'state':'ok','count':len(items)}

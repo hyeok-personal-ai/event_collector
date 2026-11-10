@@ -24,7 +24,11 @@
     "programmers.co.kr",
     "redhat.com",
     "redis.io",
-    "startupjobs.kr"
+    "rocketpunch.com",
+    "startupjobs.kr",
+    "wanted.co.kr",
+    "wanted.jobs",
+    "wntd.co"
   ],
   "source_ids": [
     "aifactory",
@@ -50,6 +54,8 @@
     "programmers",
     "redhat",
     "redis",
-    "startupjobs"
+    "rocketpunch",
+    "startupjobs",
+    "wanted"
   ]
 }
