@@ -28,7 +28,7 @@ def form_state(observation):
     closed_google=parsed.hostname=='docs.google.com' and bool(re.fullmatch(r'/forms/(?:d/e|d)/[^/]+/closedform/?',parsed.path))
     if closed_google or re.search(r'응답을 더 이상 받지|더 이상 응답을 받|응답을 받지 않|no longer accepting responses|form is closed|설문이 종료|접수가 종료|This form is currently closed',text,re.I):
         return 'CLOSED','신청폼에서 응답 종료 안내를 확인했습니다.'
-    if re.search(r'Sign in to continue|로그인하여 계속|You need permission|액세스 권한이 필요|접근 권한이 필요',text,re.I):
+    if re.search(r'Sign in to continue|로그인하여 계속|계속하려면 로그인|작성하려면 로그인해야|You must sign in to (?:fill|complete)|You need permission|액세스 권한이 필요|접근 권한이 필요',text,re.I):
         return 'CHECK_REQUIRED','신청폼에 로그인 또는 접근 권한이 필요합니다.'
     if re.search(r'Verify you are human|Verify that you are human|사람인지 확인|로봇이 아닙니다|I.m not a robot',text,re.I):
         return 'CHECK_REQUIRED','신청폼에 사람 확인 절차가 필요합니다. 자동으로 해결하지 않습니다.'
@@ -106,7 +106,12 @@ def site_markers(event,html,visible_text=None):
     return e
 
 async def check_external(e,html,renderer,fetcher):
+    from .recruitment import community_post
     forms,contacts=external_links(html,e['canonical_url'])
+    # Generic page parsing can see related-card application buttons. A community
+    # post must prove its form link inside its own content on every verification.
+    if community_post(e['canonical_url']) and e.get('application_url') and canonical(e['application_url'])!=canonical(e['canonical_url']):
+        e.pop('application_url',None)
     if e.get('application_url') and canonical(e['application_url'])!=canonical(e['canonical_url']):
         application=e['application_url']
         if authentication_url(application):

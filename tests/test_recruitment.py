@@ -9,6 +9,49 @@ from app.collector import verify, store_raw
 
 
 class RecruitmentTests(unittest.TestCase):
+    def test_removed_application_link_is_not_reused_from_previous_verification(self):
+        from unittest.mock import AsyncMock
+        class Fetcher:
+            async def page(self,url):
+                return httpx.Response(200,text='<article><h1>스터디 안내</h1><p>다음 모집은 추후 안내합니다.</p></article>',headers={'content-type':'text/html'},request=httpx.Request('GET',url))
+        renderer=type('Renderer',(),{'render':AsyncMock()})()
+        event=new_event('https://okky.kr/articles/123','스터디 안내',status='OPEN',application_url='https://forms.gle/previous')
+        result,_=asyncio.run(verify(event,Fetcher(),renderer))
+        renderer.render.assert_not_awaited()
+        self.assertEqual(result['status'],'CHECK_REQUIRED')
+        self.assertFalse(result.get('application_url'))
+
+    def test_community_related_application_button_does_not_override_article_scope(self):
+        from app.verifiers import check_external
+        from unittest.mock import AsyncMock
+        renderer=type('Renderer',(),{'render':AsyncMock()})()
+        event=new_event('https://okky.kr/articles/123','스터디',application_url='https://forms.gle/related')
+        result=asyncio.run(check_external(event,'<article><p>모집 안내 예정</p></article><aside><a href="https://forms.gle/related">신청하기</a></aside>',renderer,None))
+        renderer.render.assert_not_awaited()
+        self.assertFalse(result.get('application_url'))
+
+    def test_current_article_form_replaces_historical_form(self):
+        from app.verifiers import check_external
+        from unittest.mock import AsyncMock
+        current='https://forms.gle/current'
+        page={'url':current,'title':'스터디 지원서','text':'지원 동기','controls':[{'label':'제출','disabled':False,'form_fields':1}],'input_count':1}
+        renderer=type('Renderer',(),{'render':AsyncMock(return_value=page)})()
+        event=new_event('https://okky.kr/articles/123','스터디',application_url='https://forms.gle/old')
+        result=asyncio.run(check_external(event,f'<article><p>지원 {current}</p></article>',renderer,None))
+        renderer.render.assert_awaited_once_with(current)
+        self.assertEqual(result['status'],'OPEN')
+        self.assertEqual(result['application_url'],current)
+
+    def test_required_login_notice_is_explained_without_rejecting_optional_sign_in(self):
+        from app.verifiers import application_state
+        page={'url':'https://docs.google.com/forms/d/e/example/viewform','title':'스터디 지원서','controls':[{'label':'제출','disabled':False,'form_fields':1}],'input_count':1}
+        for text in ['계속하려면 로그인','이 설문지를 작성하려면 로그인해야 합니다.','You must sign in to fill out this form.']:
+            with self.subTest(text=text):
+                state,reason=application_state({**page,'text':text},{'title':'스터디'})
+                self.assertEqual(state,'CHECK_REQUIRED')
+                self.assertIn('로그인',reason)
+        self.assertEqual(application_state({**page,'text':'로그인하면 진행 상황을 저장할 수 있습니다.'},{'title':'스터디'})[0],'OPEN')
+
     def test_expired_recruitment_range_overrides_stale_open_badge(self):
         from datetime import datetime
         from app.core import KST

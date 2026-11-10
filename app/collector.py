@@ -138,6 +138,9 @@ def parse_page(html, url, previous, observation=None):
     soup = BeautifulSoup(html, 'html.parser')
     e = dict(previous)
     e.pop('recruitment_basis', None)
+    # An old form can remain open after the organizer removes it from the post.
+    # Derive the application route again from this response, never its history.
+    e.pop('application_url', None)
     nodes = []
     for script in soup.select('script[type="application/ld+json"]'):
         try:
