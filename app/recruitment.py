@@ -38,7 +38,7 @@ def post_content(html, url):
     return soup
 
 
-def inflearn_recruitment_deadline(main):
+def community_recruitment_deadline(main):
     """Only labelled date-only recruitment ranges/deadlines, not activity dates.
 
     Missing years are anchored to the article's own publication date, not today.
@@ -117,14 +117,15 @@ def recruitment_facts(event, html, observation=None):
         return e
     host = (urlsplit(e['canonical_url']).hostname or '').removeprefix('www.')
     soup = BeautifulSoup(html, 'html.parser')
+    if host in ('inflearn.com', 'okky.kr'):
+        extracted_deadline = community_recruitment_deadline(post_content(html,e['canonical_url']))
+        if extracted_deadline and not e.get('apply_deadline'):
+            e['apply_deadline'] = extracted_deadline
     if host == 'inflearn.com':
         e['activity_type'] = 'study' if '/studies/' in e['canonical_url'] else 'project'
         # A crawl-friendly article may omit the platform's recruitment status.
         # Never infer OPEN from its title or a recommended article's badge.
         main = post_content(html, e['canonical_url'])
-        extracted_deadline = inflearn_recruitment_deadline(main)
-        if extracted_deadline and not e.get('apply_deadline'):
-            e['apply_deadline'] = extracted_deadline
         labels = [x.get_text(' ', strip=True) for x in main.select('button')]
         if any(x in ('모집완료', '모집 완료', '모집 마감') for x in labels):
             e.update(status='CLOSED', evidence='인프런 개별 모집글의 모집 완료 표시 확인')

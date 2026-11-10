@@ -30,10 +30,10 @@ class RecruitmentTests(unittest.TestCase):
 
     def test_recruitment_dates_require_article_context_and_unambiguous_ranges(self):
         from bs4 import BeautifulSoup
-        from app.recruitment import inflearn_recruitment_deadline
+        from app.recruitment import community_recruitment_deadline
         def extract(body,posted='26.12.20 10:00'):
             html=('<span class="sub-title__created-at"><span class="sub-title__value">'+posted+'</span></span>' if posted else '')+body
-            return inflearn_recruitment_deadline(BeautifulSoup(html,'html.parser'))
+            return community_recruitment_deadline(BeautifulSoup(html,'html.parser'))
         self.assertEqual(extract('<p>접수 기간: 12/20 ~ 01/05</p>'),'2027-01-05T23:59:59+09:00')
         self.assertEqual(extract('<p>모집 기간: 2026.10.26 ~ 2026.11.06</p>',None),'2026-11-06T23:59:59+09:00')
         for body,posted in [('<p>활동 기간: 12/20 ~ 01/05</p>','26.12.20 10:00'),('<p>모집 기간: 12/20 ~ 01/05</p>',None),('<p>모집 기간: 12/20 ~ 01/05 18:00</p>','26.12.20 10:00'),('<p>모집 기간: 12/20 ~ 01/05</p><p>모집 기간: 12/20 ~ 01/10</p>','26.12.20 10:00'),('<p>모집 기간: 12/20 ~ 02/30</p>','26.12.20 10:00')]:
@@ -46,14 +46,24 @@ class RecruitmentTests(unittest.TestCase):
 
     def test_labelled_single_deadlines_and_split_labels(self):
         from bs4 import BeautifulSoup
-        from app.recruitment import inflearn_recruitment_deadline
+        from app.recruitment import community_recruitment_deadline
         def extract(body):
-            return inflearn_recruitment_deadline(BeautifulSoup('<time datetime="2026-11-04T12:00:00+09:00"></time>'+body,'html.parser'))
+            return community_recruitment_deadline(BeautifulSoup('<time datetime="2026-11-04T12:00:00+09:00"></time>'+body,'html.parser'))
         self.assertEqual(extract('<p>- 지원기간: 26년 11월 14일까지</p>'),'2026-11-14T23:59:59+09:00')
         self.assertEqual(extract('<b>- 모집 기간</b><p>: ~11/20 (금)까지</p>'),'2026-11-20T23:59:59+09:00')
         self.assertEqual(extract('<p>접수 마감: 2026년 11월 14일까지</p>'),'2026-11-14T23:59:59+09:00')
         for body in ['<p>활동 기간: 26년 11월 14일까지</p>', '<p>지원 기간: ~2026년</p>', '<p>모집 기간: ~11/20 (일)까지</p>', '<p>모집 기간: 26년 11월 14일 18시까지</p>', '<p>모집 기간: 26년 11월 14일까지</p><p>지원 기간: 26년 11월 15일까지</p>']:
             with self.subTest(body=body):self.assertIsNone(extract(body))
+
+    def test_okky_deadline_uses_own_article_not_adjacent_cards(self):
+        from datetime import datetime
+        from app.core import KST
+        event=new_event('https://okky.kr/articles/1565400?topic=gathering','프로젝트')
+        html='<article><time datetime="2026-10-14T09:13:01"></time><b>- 모집 기간</b><p>: ~10/18 (일)까지</p></article><aside>모집 기간: ~12/20까지</aside>'
+        with patch('app.recruitment.now',return_value=datetime(2026,11,10,tzinfo=KST)):
+            result=recruitment_facts(event,html)
+        self.assertEqual(result['apply_deadline'],'2026-10-18T23:59:59+09:00')
+        self.assertEqual(result['status'],'CLOSED')
 
     def test_title_and_related_open_badge_do_not_confirm_recruitment(self):
         e=new_event('https://www.inflearn.com/projects/123/example','모집 중 프로젝트')
