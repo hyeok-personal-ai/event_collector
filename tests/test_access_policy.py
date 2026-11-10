@@ -5,7 +5,7 @@ from app.batch_common import public_event
 
 class AccessPolicyTests(unittest.TestCase):
     def test_blocked_host_and_subdomain(self):
-        for url in ['https://redis.io/events/x','https://x.devpost.com/','https://blog.jetbrains.com/','https://dev-korea.com/events','https://jumpit.saramin.co.kr/event/x','https://holaworld.io/study/x','https://www.startupjobs.kr/events','https://www.nvidia.com/events','https://aws.amazon.com/events']:
+        for url in ['https://raw.githubusercontent.com/brave-people/Dev-Event/master/README.md','https://redis.io/events/x','https://x.devpost.com/','https://blog.jetbrains.com/','https://dev-korea.com/events','https://jumpit.saramin.co.kr/event/x','https://holaworld.io/study/x','https://www.startupjobs.kr/events','https://www.nvidia.com/events','https://aws.amazon.com/events']:
             with self.assertRaises(ValueError):assert_collection_allowed(url)
         assert_collection_allowed('https://notredis.io/study')
     def test_source_disabled(self):
