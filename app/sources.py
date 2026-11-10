@@ -269,6 +269,10 @@ async def discover(fetcher, renderer, record, selected=None):
                 if not items and renderer and (s.dynamic or 'html' in r.headers.get('content-type','')):
                     async with dynamic_sem:
                         rendered=await renderer.render(s.url)
+                    if rendered.get('http_status',200)>=400:
+                        raise ValueError(f"브라우저 원문 접근 실패 HTTP {rendered['http_status']}")
+                    if re.search(r'Just a moment|Checking your browser|Access denied',rendered.get('title',''),re.I):
+                        raise ValueError('사이트 접근 확인 화면입니다. 차단을 우회하지 않습니다.')
                     items=club_candidates(rendered['html'],rendered['url'],s) if s.club else extract_links(rendered['html'],rendered['url'],s)
                     result['method']='browser'
                 result['count']=len(items)
@@ -281,7 +285,7 @@ async def discover(fetcher, renderer, record, selected=None):
             except Exception as exc:
                 message=str(exc) or type(exc).__name__
                 status=getattr(getattr(exc,'response',None),'status_code',None)
-                blocked='robots' in message or status in (401,403,429) or 'CERTIFICATE_VERIFY_FAILED' in message
+                blocked='robots' in message or '차단' in message or bool(re.search(r'HTTP (401|403|429)',message)) or status in (401,403,429) or 'CERTIFICATE_VERIFY_FAILED' in message
                 if status==404:message='등록한 공개 목록 주소가 없어졌습니다(HTTP 404). 공식 대체 주소 확인이 필요합니다.'
                 elif status in (401,403,429):message=f'사이트가 자동 접근을 제한했습니다(HTTP {status}). 로그인·차단을 우회하지 않습니다.'
                 elif 'certificate has expired' in message:message='공식 사이트의 TLS 인증서가 만료됐습니다. 사이트 운영자 조치가 필요합니다.'

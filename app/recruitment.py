@@ -3,7 +3,7 @@ import re
 from urllib.parse import urlsplit
 from bs4 import BeautifulSoup
 
-VERSION = 2
+VERSION = 3
 COMMUNITY_HOSTS = ('inflearn.com', 'holaworld.io', 'okky.kr')
 
 

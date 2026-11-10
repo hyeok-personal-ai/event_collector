@@ -49,3 +49,29 @@ class RecruitmentTests(unittest.TestCase):
     def test_production_does_not_persist_raw_posts(self):
         with patch.dict('os.environ',{},clear=True):
             self.assertIsNone(store_raw('<p>private contact in public post</p>'))
+
+    def test_survey_and_unknown_form_are_not_recruitment(self):
+        from app.verifiers import application_state
+        page={'text':'입력 제출','title':'스터디 지원서','controls':[{'label':'제출','disabled':False,'form_fields':1}],'input_count':1}
+        self.assertEqual(application_state(page,{'title':'스터디 모집'})[0],'OPEN')
+        self.assertEqual(application_state({**page,'title':'자기계발 설문조사'},{'title':'스터디'})[0],'CHECK_REQUIRED')
+        self.assertEqual(application_state(page,{'title':'[설문] 자기계발 조사'})[0],'CHECK_REQUIRED')
+        self.assertEqual(application_state({**page,'title':'이름 없는 폼'},{'title':'스터디 모집'})[0],'CHECK_REQUIRED')
+        self.assertEqual(application_state({**page,'title':'앱 프로젝트','text':'지원동기 지원분야 제출'},{'title':'프로젝트 모집'})[0],'OPEN')
+
+    def test_same_public_form_is_rendered_once_per_batch(self):
+        from unittest.mock import AsyncMock
+        from app.browser import BrowserRenderer
+        async def check():
+            fetcher=type('Fetcher',(),{'allowed':AsyncMock()})()
+            renderer=BrowserRenderer(fetcher,budget=1)
+            result={'url':'https://docs.google.com/forms/d/e/public/viewform','http_status':200,'title':'스터디 지원서'}
+            with patch('app.collector.public_url',new=AsyncMock()),patch.object(renderer,'_render',return_value=result) as render:
+                try:
+                    self.assertEqual(await renderer.render('https://forms.gle/public'),result)
+                    self.assertEqual(await renderer.render('https://forms.gle/public'),result)
+                    self.assertEqual(await renderer.render(result['url']),result)
+                    self.assertEqual(render.call_count,1)
+                    self.assertEqual(renderer.used,1)
+                finally:await renderer.close()
+        asyncio.run(check())

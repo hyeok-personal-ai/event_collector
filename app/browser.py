@@ -28,6 +28,7 @@ class BrowserRenderer:
         self.fetcher = fetcher
         self.remaining = budget
         self.used = 0
+        self.observations = {}
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix='radar-browser')
         self.driver = self.browser = None
         self.loop = None
@@ -35,15 +36,22 @@ class BrowserRenderer:
 
     async def render(self, url):
         from .collector import public_url
+        from .core import canonical
+        key=canonical(url)
         await public_url(url)
         await self.fetcher.allowed(url)
         async with self.semaphore:
+            if key in self.observations:return self.observations[key]
             if self.remaining <= 0:
                 raise ValueError('이번 실행의 브라우저 검증 한도에 도달했습니다. 다음 실행에서 재시도합니다.')
             self.remaining -= 1
             self.used += 1
             self.loop = asyncio.get_running_loop()
-            return await self.loop.run_in_executor(self.executor, self._render, url)
+            result=await self.loop.run_in_executor(self.executor, self._render, url)
+            if result.get('http_status')==200:
+                self.observations[key]=result
+                self.observations[canonical(result['url'])]=result
+            return result
 
     def _guard(self, route):
         from .collector import public_url

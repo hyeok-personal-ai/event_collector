@@ -24,6 +24,19 @@ def form_state(observation):
         return 'OPEN','신청폼의 입력 필드와 활성 제출/다음 버튼을 확인했습니다. 실제 제출은 하지 않았습니다.'
     return 'CHECK_REQUIRED','신청폼은 열렸으나 현재 응답 가능 조건을 충분히 확인하지 못했습니다.'
 
+def application_state(observation,event):
+    status,evidence=form_state(observation)
+    if status!='OPEN':return status,evidence
+    # An answerable survey is not an application. Inspect the form's own purpose.
+    title=re.sub(r'\s*[-–|]\s*(?:Google Forms|Google 설문지).*$', '', observation.get('title',''), flags=re.I)
+    survey=r'설문|수요.?조사|만족도|피드백|survey|feedback|questionnaire'
+    if re.search(survey,title,re.I) or re.match(r'\s*[\[【(]?\s*(?:설문|survey|수요.?조사)',event.get('title',''),re.I):
+        return 'CHECK_REQUIRED','응답 가능한 설문·조사입니다. 활동 참가 신청서로 확인되지 않아 모집 중으로 표시하지 않습니다.'
+    purpose=re.search(r'지원|신청|등록|모집|가입|registration|application|sign.?up|join|RSVP',title,re.I) or re.search(r'지원\s*(?:동기|분야|이유)|참여\s*(?:동기|이유)|참가\s*(?:신청|등록)',observation.get('text','')[:3000])
+    if not purpose:
+        return 'CHECK_REQUIRED','폼 응답은 가능하지만 폼 제목·문항에서 활동 참가 신청 목적을 확인하지 못했습니다.'
+    return status,'참가 신청 목적을 폼 제목·문항에서 확인했습니다. '+evidence
+
 def external_links(html,base):
     from urllib.parse import urljoin
     from .recruitment import post_content
@@ -86,7 +99,7 @@ async def check_external(e,html,renderer,fetcher):
         try:
             if not renderer:raise ValueError('브라우저 검증이 비활성화되어 있습니다.')
             page=await renderer.render(url)
-            status,evidence=form_state(page)
+            status,evidence=application_state(page,e)
             result.update(status=status,evidence=evidence)
             e['application_url']=page['url']
         except Exception as exc:
@@ -96,7 +109,7 @@ async def check_external(e,html,renderer,fetcher):
     if forms:
         states={c['status'] for c in e['application_checks']}
         if states=={'OPEN'} and e.get('status') not in ('CLOSED','DEAD','SOLD_OUT'):
-            e.update(status='WAITLIST' if e['status']=='WAITLIST' else 'OPEN',recruitment_basis='application',evidence=e['evidence']+' / '+e['application_checks'][0]['evidence'])
+            e.update(status='WAITLIST' if e['status']=='WAITLIST' else 'OPEN',recruitment_basis='application',evidence='원문에 연결된 신청폼: '+e['application_checks'][0]['evidence'])
         elif states=={'CLOSED'}:
             e.update(status='CLOSED',evidence='확인한 신청폼이 모두 접수 종료 상태입니다.')
         else:
