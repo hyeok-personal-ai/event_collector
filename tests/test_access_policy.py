@@ -24,3 +24,24 @@ class AccessPolicyTests(unittest.TestCase):
         self.assertEqual(location_facts({'location':{'@type':'VirtualLocation','name':'Zoom'}})['attendance_mode'],'online')
         self.assertEqual(location_facts({'location':[{'@type':'VirtualLocation'},{'@type':'Place','name':'Seoul venue'}]})['attendance_mode'],'hybrid')
         self.assertIsNone(location_facts({'location':{'name':'Secret venue'}})['country_code'])
+
+    def test_shortlink_robots_unavailable_is_not_access_denied(self):
+        import asyncio, httpx
+        from unittest.mock import AsyncMock
+        from app.collector import Fetcher
+        async def check():
+            f=Fetcher()
+            try:
+                f.request=AsyncMock(return_value=httpx.Response(400,text='Invalid Dynamic Link'))
+                await f.allowed('https://forms.gle/publicForm')
+                for code in [401,403,429,500]:
+                    f.robots.clear()
+                    f.request=AsyncMock(return_value=httpx.Response(code,text='Access denied'))
+                    with self.assertRaises(ValueError): await f.allowed('https://forms.gle/publicForm')
+                f.robots.clear()
+                f.request=AsyncMock(return_value=httpx.Response(400,text='Access denied'))
+                with self.assertRaises(ValueError): await f.allowed('https://forms.gle/publicForm')
+                f.request=AsyncMock(return_value=httpx.Response(200,text='User-agent: *\nDisallow: /private'))
+                with self.assertRaises(ValueError): await f.allowed('https://docs.google.com/private')
+            finally: await f.close()
+        asyncio.run(check())

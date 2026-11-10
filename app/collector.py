@@ -93,7 +93,10 @@ class Fetcher:
         origin = f'{p.scheme}://{p.netloc}'
         if origin not in self.robots:
             response = await self.request(origin + '/robots.txt')
-            if response.status_code == 404:
+            # forms.gle treats the non-link path /robots.txt as an invalid Dynamic Link.
+            # RFC 9309 2.3.1.3: unavailable robots is distinct from denied access.
+            unavailable_shortlink = p.hostname == 'forms.gle' and response.status_code == 400 and 'Invalid Dynamic Link' in response.text
+            if response.status_code in (404,410) or unavailable_shortlink:
                 self.robots[origin] = None
             elif response.status_code >= 400:
                 raise ValueError(f'robots.txt 확인 실패 (HTTP {response.status_code})')
