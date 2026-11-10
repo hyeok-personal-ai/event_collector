@@ -57,7 +57,7 @@ from app.sources import SOURCES
 
 class RestrictedSourceTests(unittest.TestCase):
     def test_restricted_details_cannot_reenter_through_another_source(self):
-        for host in ('programmers.co.kr', 'daker.ai', 'dacon.io', 'aifactory.space', 'partiful.com', 'linkedin.com', 'onoffmix.com', 'wanted.co.kr', 'wanted.jobs', 'wntd.co', 'rocketpunch.com'):
+        for host in ('programmers.co.kr', 'daker.ai', 'dacon.io', 'aifactory.space', 'partiful.com', 'linkedin.com', 'onoffmix.com', 'wanted.co.kr', 'wanted.jobs', 'wntd.co', 'rocketpunch.com', 'k-startup.go.kr'):
             with self.subTest(host=host):
                 with self.assertRaises(ValueError):
                     assert_collection_allowed('https://www.'+host+'/events/example')
