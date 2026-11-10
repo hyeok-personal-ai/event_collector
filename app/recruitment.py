@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 from bs4 import BeautifulSoup
 from .core import KST, now, parse_date
 
-VERSION = 3
+VERSION = 4
 COMMUNITY_HOSTS = ('inflearn.com', 'holaworld.io', 'okky.kr')
 
 
