@@ -86,6 +86,10 @@ class RecruitmentTests(unittest.TestCase):
         self.assertEqual(application_state(public,{'title':'스터디'})[0],'OPEN')
         self.assertEqual(application_state({**public,'http_status':403},{'title':'스터디'})[0],'CHECK_REQUIRED')
         self.assertEqual(application_state({**public,'title':'로그인 - 참가 신청'},{'title':'스터디'})[0],'CHECK_REQUIRED')
+        closed={**public,'url':'https://docs.google.com/forms/d/e/public/closedform','controls':[],'input_count':0,'text':'응답을 받지 않고 있습니다.'}
+        self.assertEqual(application_state(closed,{'title':'스터디'})[0],'CLOSED')
+        self.assertEqual(application_state({**closed,'text':''},{'title':'스터디'})[0],'CLOSED')
+        self.assertEqual(application_state({**closed,'http_status':403},{'title':'스터디'})[0],'CHECK_REQUIRED')
 
     def test_auth_redirect_preserves_public_application_link(self):
         from app.verifiers import check_external

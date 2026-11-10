@@ -24,7 +24,9 @@ def form_state(observation):
         return 'CHECK_REQUIRED','신청폼 요청이 실패했습니다. 오류 화면으로 접수 가능 여부를 판정하지 않습니다.'
     if authentication_page(observation):
         return 'CHECK_REQUIRED','신청서 대신 계정 로그인 화면으로 연결됩니다. 공개 상태에서 접수 가능 여부를 확인하지 못했습니다.'
-    if re.search(r'응답을 더 이상 받지|더 이상 응답을 받|no longer accepting responses|form is closed|설문이 종료|접수가 종료|This form is currently closed',text,re.I):
+    parsed=urlsplit(observation.get('url',''))
+    closed_google=parsed.hostname=='docs.google.com' and bool(re.fullmatch(r'/forms/(?:d/e|d)/[^/]+/closedform/?',parsed.path))
+    if closed_google or re.search(r'응답을 더 이상 받지|더 이상 응답을 받|응답을 받지 않|no longer accepting responses|form is closed|설문이 종료|접수가 종료|This form is currently closed',text,re.I):
         return 'CLOSED','신청폼에서 응답 종료 안내를 확인했습니다.'
     if re.search(r'Sign in to continue|로그인하여 계속|You need permission|액세스 권한이 필요|접근 권한이 필요',text,re.I):
         return 'CHECK_REQUIRED','신청폼에 로그인 또는 접근 권한이 필요합니다.'
