@@ -76,4 +76,25 @@ class PublicCollectorTests(unittest.TestCase):
         self.assertEqual([d['batch'] for a,d in calls if a=='claim'],[0,1,2])
         self.assertEqual(calls[-1][0],'finish')
 
+    def test_failed_item_keeps_legacy_identity_and_counts_attempt(self):
+        from app import cloud_batch as batch
+        calls=[]
+        legacy='https://example.com/모집/?q=a%20b'
+        async def call(self,action,**data):
+            calls.append((action,data))
+            if action=='start':return {'state':'started','run':{'run_id':data['token'],'sources':[],'verified':0}}
+            if action=='prepare':return {'stats':{'due':0}}
+            if action=='claim':return {'items':[{'id':'one','event':{'canonical_url':legacy,'title':'Study'}}] if data['batch']==0 else []}
+            return {'state':'saved'}
+        async def discover(*args):return [],[]
+        async def verify(event,*args):
+            self.assertEqual(event['canonical_url'],legacy)
+            return {**event,'failure_count':1,'collection_route':{'state':'alternate','original_url':legacy}},''
+        with patch.object(batch,'SITE','https://tech-event-radar-kr.qkdrhkgn123.chatgpt.site'),patch.dict(os.environ,{'GITHUB_REPOSITORY':'hyeok-personal-ai/event_collector','GITHUB_RUN_ID':'123','GITHUB_REF':'refs/heads/main'}),patch.object(batch,'read_key',return_value='test-only'),patch.object(batch.RemoteQueue,'call',call),patch.object(batch,'discover',discover),patch.object(batch,'verify',verify):
+            result=asyncio.run(batch.collect(dynamic_budget=0))
+        self.assertEqual(result['state'],'partial')
+        failure=next(d for a,d in calls if a=='fail')
+        self.assertNotIn('route',failure)  # Failed writes never claim a successful alternate path.
+        self.assertEqual(calls[-1][1]['run']['attempted'],1)
+
 if __name__=='__main__':unittest.main()

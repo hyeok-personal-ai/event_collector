@@ -73,6 +73,8 @@ async def collect(force=False, verify_limit=1000, dynamic_budget=64, time_budget
                 host=urlsplit(item['event']['canonical_url']).hostname
                 async with sem, host_locks.setdefault(host,asyncio.Lock()):
                     e=new_event(**{'url':item['event']['canonical_url'],**{k:v for k,v in item['event'].items() if k!='canonical_url'}})
+                    # Queue identity is owned by the server, including legacy URLs.
+                    e['canonical_url']=item['event']['canonical_url']
                     result=None
                     try:
                         result,_=await asyncio.wait_for(verify(e,fetcher,renderer),timeout=max(1,min(105,deadline-time.monotonic())))
@@ -85,7 +87,7 @@ async def collect(force=False, verify_limit=1000, dynamic_budget=64, time_budget
                     except Exception as exc:
                         failures+=1
                         payload={'reported_at':iso_now()}
-                        if result and result.get('collection_route'):
+                        if result and result.get('collection_route',{}).get('state') in ('direct','review') and result['collection_route'].get('original_url')==e['canonical_url']:
                             payload={'route':result['collection_route'],'reported_at':iso_now()}
                         await queue.call('fail',token=token,id=item['id'],error=(type(exc).__name__+': '+str(exc))[:350],**payload)
                         print(json.dumps({'verification_failed':item['id'],'type':type(exc).__name__}),flush=True)
@@ -93,11 +95,12 @@ async def collect(force=False, verify_limit=1000, dynamic_budget=64, time_budget
             while attempted<verify_limit and time.monotonic()<deadline-10:
                 selected=(await queue.call('claim',token=token,batch=batch,limit=min(40,verify_limit-attempted)))['items']
                 if not selected:break
+                attempted+=len(selected)
+                run['attempted']=attempted
                 outcomes=await asyncio.gather(*(check(item) for item in selected),return_exceptions=True)
                 errors=[e for e in outcomes if isinstance(e,Exception)]
                 if errors:raise errors[0]
-                attempted+=len(selected);batch+=1
-                run['attempted']=attempted
+                batch+=1
                 await queue.call('progress',token=token,run=run)
             remaining=(await queue.call('prepare',token=token))['stats']
             run['deferred']=remaining['due']
