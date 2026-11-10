@@ -75,3 +75,29 @@ class RecruitmentTests(unittest.TestCase):
                     self.assertEqual(renderer.used,1)
                 finally:await renderer.close()
         asyncio.run(check())
+
+    def test_login_and_error_pages_are_not_applications(self):
+        from app.verifiers import application_state
+        page={'text':'이메일 또는 휴대전화 다음','title':'행사 참가 신청','url':'https://accounts.google.com/v3/signin/identifier','controls':[{'label':'다음','disabled':False,'form_fields':1}],'input_count':1}
+        self.assertEqual(application_state(page,{'title':'해커톤'})[0],'CHECK_REQUIRED')
+        for url in ['https://login.microsoftonline.com/common/oauth2/authorize','https://nid.naver.com/nidlogin.login','https://example.org/login']:
+            self.assertEqual(application_state({**page,'url':url},{'title':'해커톤'})[0],'CHECK_REQUIRED')
+        public={**page,'url':'https://docs.google.com/forms/d/e/public/viewform','title':'스터디 신청서','text':'로그인하면 진행 상황을 저장할 수 있습니다. 이름 참가 신청 다음'}
+        self.assertEqual(application_state(public,{'title':'스터디'})[0],'OPEN')
+        self.assertEqual(application_state({**public,'http_status':403},{'title':'스터디'})[0],'CHECK_REQUIRED')
+        self.assertEqual(application_state({**public,'title':'로그인 - 참가 신청'},{'title':'스터디'})[0],'CHECK_REQUIRED')
+
+    def test_auth_redirect_preserves_public_application_link(self):
+        from app.verifiers import check_external
+        from unittest.mock import AsyncMock
+        form='https://forms.gle/real'
+        login='https://accounts.google.com/v3/signin/identifier'
+        async def check():
+            renderer=type('Renderer',(),{'render':AsyncMock(return_value={'url':login,'title':'Google 로그인','text':'이메일 다음','input_count':1,'controls':[{'label':'다음','disabled':False,'form_fields':1}]})})()
+            event={'canonical_url':'https://example.org/event/1','application_url':login,'status':'OPEN','title':'스터디 신청'}
+            result=await check_external(event,f'<main><a href="{form}">신청서</a></main>',renderer,None)
+            renderer.render.assert_awaited_once_with(form)
+            self.assertEqual(result['status'],'CHECK_REQUIRED')
+            self.assertEqual(result['application_url'],form)
+            self.assertIn('로그인 화면',result['evidence'])
+        asyncio.run(check())

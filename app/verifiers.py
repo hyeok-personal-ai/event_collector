@@ -8,8 +8,22 @@ FORM_HOSTS=('docs.google.com','forms.gle','tally.so','tally.so','form.typeform.c
 FORM_LINK=re.compile(r'(?:docs\.google\.com/forms/|forms\.gle/|tally\.so/r/|typeform\.com/to/|forms\.office\.com/|form\.naver\.com/)',re.I)
 CONTACT_LINK=re.compile(r'(?:open\.kakao\.com/|discord\.gg/|discord\.com/invite/)',re.I)
 
+def authentication_url(url):
+    parsed=urlsplit(url or '')
+    host=(parsed.hostname or '').lower()
+    identity_hosts=('accounts.google.com','login.microsoftonline.com','login.live.com','nid.naver.com','accounts.kakao.com')
+    return host in identity_hosts or bool(re.search(r'/(?:login|signin|sign-in|sign_in)(?:/|$)',parsed.path,re.I))
+
+def authentication_page(observation):
+    return authentication_url(observation.get('url')) or bool(re.fullmatch(
+        r'\s*(?:로그인|Sign in|Log in)(?:\s*[-–|:].*)?\s*',observation.get('title',''),re.I))
+
 def form_state(observation):
-    text=observation['text']
+    text=observation.get('text','')
+    if observation.get('http_status',200)>=400:
+        return 'CHECK_REQUIRED','신청폼 요청이 실패했습니다. 오류 화면으로 접수 가능 여부를 판정하지 않습니다.'
+    if authentication_page(observation):
+        return 'CHECK_REQUIRED','신청서 대신 계정 로그인 화면으로 연결됩니다. 공개 상태에서 접수 가능 여부를 확인하지 못했습니다.'
     if re.search(r'응답을 더 이상 받지|더 이상 응답을 받|no longer accepting responses|form is closed|설문이 종료|접수가 종료|This form is currently closed',text,re.I):
         return 'CLOSED','신청폼에서 응답 종료 안내를 확인했습니다.'
     if re.search(r'Sign in to continue|로그인하여 계속|You need permission|액세스 권한이 필요|접근 권한이 필요',text,re.I):
@@ -92,7 +106,13 @@ def site_markers(event,html,visible_text=None):
 async def check_external(e,html,renderer,fetcher):
     forms,contacts=external_links(html,e['canonical_url'])
     if e.get('application_url') and canonical(e['application_url'])!=canonical(e['canonical_url']):
-        forms=list(dict.fromkeys([e['application_url']]+forms))[:2]
+        application=e['application_url']
+        if authentication_url(application):
+            # Old observations stored transient sign-in redirects. Rediscover the
+            # public form from the original post instead of retrying that redirect.
+            e.pop('application_url',None)
+            if not forms:forms=[application]
+        else:forms=list(dict.fromkeys([application]+forms))[:2]
     e['application_checks']=[]
     for url in forms:
         result={'url':url,'status':'CHECK_REQUIRED','checked_at':iso_now()}
@@ -101,7 +121,8 @@ async def check_external(e,html,renderer,fetcher):
             page=await renderer.render(url)
             status,evidence=application_state(page,e)
             result.update(status=status,evidence=evidence)
-            e['application_url']=page['url']
+            if not authentication_page(page):e['application_url']=page['url']
+            elif not authentication_url(url):e['application_url']=url
         except Exception as exc:
             result['evidence']=str(exc)[:300]
             if e.get('status')=='OPEN':e['status']='CHECK_REQUIRED'
@@ -113,7 +134,8 @@ async def check_external(e,html,renderer,fetcher):
         elif states=={'CLOSED'}:
             e.update(status='CLOSED',evidence='확인한 신청폼이 모두 접수 종료 상태입니다.')
         else:
-            e.update(status='CHECK_REQUIRED',evidence='신청 경로의 상태가 서로 다르거나 일부를 확인하지 못했습니다.')
+            detail=' / '.join(c['evidence'] for c in e['application_checks'] if c['status']=='CHECK_REQUIRED')
+            e.update(status='CHECK_REQUIRED',evidence='신청 경로의 상태가 서로 다르거나 일부를 확인하지 못했습니다. '+detail[:500])
     for url in contacts[:1]:
         result={'url':url,'status':'CHECK_REQUIRED','checked_at':iso_now()}
         try:
