@@ -130,6 +130,25 @@ RETIRED = {
     'partiful':('소개 페이지에는 행사 목록이 없고 Explore는 일반 친목 행사 중심입니다. 개발자 행사 목록으로 대체합니다.',('eventus',)),
     'disquiet':('개편된 홈은 제품·일반 게시글 중심이며 프로젝트 모집 전용 목록이 아닙니다. 실제 모집 목록으로 대체합니다.',('sideproject',)),
 }
+# Reviewed public-reuse restrictions also apply to discovered detail URLs.
+RETIRED.update({'onoffmix': ('제14조 제8항 제7호의 사전 승낙 없는 서비스 외 목적 복제·제3자 제공 제한을 확인했습니다. 기존 robots 제한에 더해 허가 전 수집·공개 제공을 보류합니다.',
+              ()),
+ 'linkedin': ('공식 도움말과 이용약관 8.2의 자동 수집 및 권리자 동의 없는 정보 이용·표시·배포 제한을 확인했습니다. robots 제한과 별개로 직접·간접 수집을 중지합니다.',
+              ()),
+ 'partiful': ('Intellectual Property Rights의 명시적 허가 없는 서비스 콘텐츠 스크래핑·복사·배포 제한을 확인했습니다. 행사 목록뿐 아니라 다른 소스에서 발견된 '
+              '개별 주소도 수집 보류합니다.',
+              ()),
+ 'programmers': ('2026-05-16 적용 약관 제19조 제4항·제5항 제10호의 정보 제공 및 무단 크롤링·스크래핑 제한을 확인했습니다. 허가 확인 전 자동 수집·공개 제공을 '
+                 '중지합니다.',
+                 ()),
+ 'aifactory': ('공식 화면 하단 이용약관의 제10조 회원 개인정보 수집 금지와 제13조 사전 승낙 없는 제3자 이용 제한을 확인했습니다. 비상업 공개 색인의 허용 범위가 명확해질 '
+               '때까지 보류합니다. 약관은 하단 이용약관 창에서 열립니다.',
+               ()),
+ 'dacon': ('2026-08-21 시행 약관 제21조 제7항의 사전동의 없는 복사·복제·제3자 제공 제한을 확인했습니다. 공개 색인 허가 범위 확인 전 수집·공개 제공을 보류합니다.',
+           ()),
+ 'daker': ('DAKER 하단 이용약관이 연결하는 2026-08-21 문서 제2조에 daker.ai가 포함됩니다. 제21조 제7항의 사전동의 없는 정보 복제·제3자 제공 제한에 따라 공개 '
+           '색인 허가 확인 전 보류합니다.',
+           ())})
 SOURCES=[replace(s,**REPAIRS.get(s.id,{})) for s in SOURCES]
 SOURCES=[replace(s,enabled=False,note=RETIRED[s.id][0],replacements=RETIRED[s.id][1]) if s.id in RETIRED else s for s in SOURCES]
 SOURCES += [

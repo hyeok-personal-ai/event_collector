@@ -13,7 +13,7 @@ from urllib.robotparser import RobotFileParser
 import httpx
 from bs4 import BeautifulSoup
 from .core import canonical, parse_date, now, iso_now, categories, activity_type
-from .access_policy import assert_collection_allowed
+from .access_policy import assert_collection_allowed, assert_event_collection_allowed
 
 USER_AGENT = 'TechEventRadar/1.0 (+https://github.com/hyeok-personal-ai/event_collector; noncommercial)'
 DEV_EVENT_URL = 'https://raw.githubusercontent.com/brave-people/Dev-Event/master/README.md'
@@ -346,6 +346,7 @@ async def _verify_page(event, fetcher, renderer=None):
 ALTERNATIVE_ROUTES=json.loads((Path(__file__).parent/'alternative-sources.json').read_text(encoding='utf-8'))
 
 async def verify(event, fetcher, renderer=None):
+    assert_event_collection_allowed(event)
     from .route_resolver import resolve, routing, needs_alternative
     if event.get('_manual_route'):
         from .route_resolver import verify_manual

@@ -45,3 +45,39 @@ class AccessPolicyTests(unittest.TestCase):
                 with self.assertRaises(ValueError): await f.allowed('https://docs.google.com/private')
             finally: await f.close()
         asyncio.run(check())
+
+
+import asyncio
+import unittest
+from app.access_policy import assert_collection_allowed, assert_event_collection_allowed
+from app.collector import verify
+from app.core import new_event
+from app.sources import SOURCES
+
+
+class RestrictedSourceTests(unittest.TestCase):
+    def test_restricted_details_cannot_reenter_through_another_source(self):
+        for host in ('programmers.co.kr', 'daker.ai', 'dacon.io', 'aifactory.space', 'partiful.com', 'linkedin.com', 'onoffmix.com'):
+            with self.subTest(host=host):
+                with self.assertRaises(ValueError):
+                    assert_collection_allowed('https://www.'+host+'/events/example')
+        assert_collection_allowed('https://programmers.co.kr.example.org/event')
+        assert_collection_allowed('https://example.org/programmers.co.kr')
+
+    def test_held_provenance_blocks_before_fetch_or_alternative_lookup(self):
+        class NoNetwork:
+            async def page(self, url):
+                raise AssertionError('restricted-origin event must not be fetched')
+        event=new_event('https://example.org/public-event', 'Community meetup')
+        for provenance in ({'discovery_source':'programmers'}, {'discovery_url':'https://daker.ai/public/hackathons/a'}):
+            with self.subTest(provenance=provenance), self.assertRaises(ValueError):
+                asyncio.run(verify({**event, **provenance}, NoNetwork()))
+
+    def test_restricted_source_catalog_and_provenance_are_consistent(self):
+        from app.access_policy import RESTRICTED_SOURCES
+        for source in SOURCES:
+            if source.id in RESTRICTED_SOURCES:
+                self.assertFalse(source.enabled, source.id)
+        with self.assertRaises(ValueError):
+            assert_collection_allowed('https://github.com/brave-people/%44ev-Event/blob/master/README.md')
+        assert_event_collection_allowed({'canonical_url':'https://example.org/a','discovery_source':'eventus'})

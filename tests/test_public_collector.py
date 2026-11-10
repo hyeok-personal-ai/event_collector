@@ -6,6 +6,7 @@ from app.sources import SOURCES, extract_links
 from app.core import canonical
 from app.batch_common import public_event
 from app.batch_key import read_key
+from app.access_policy import RESTRICTED_SOURCES
 
 class PublicCollectorTests(unittest.TestCase):
     def test_catalog_replacements_are_active(self):
@@ -14,7 +15,7 @@ class PublicCollectorTests(unittest.TestCase):
         for s in SOURCES:
             if not s.enabled:
                 self.assertTrue(s.note)
-                self.assertTrue(s.replacements or s.id in {'dev_event','redis','devpost','devkorea','jetbrains','jumpit','hola','letspl','nvidia','aws','oracle','mongodb','microsoft','redhat','lablab','startupjobs','modulabs'}, 'Excluded sources need an active alternative or an explicit policy restriction')
+                self.assertTrue(s.replacements or s.id in RESTRICTED_SOURCES, 'Excluded sources need an active alternative or an explicit policy restriction')
             for replacement in s.replacements:
                 self.assertTrue(sources[replacement].enabled)
 
