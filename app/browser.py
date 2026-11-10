@@ -99,6 +99,8 @@ class BrowserRenderer:
                 page.wait_for_load_state('networkidle', timeout=4000)
             except BrowserTimeout:
                 pass
+            from .club_pages import wait_for_club_content
+            wait_for_club_content(page)
             # All observations come from rendered DOM, including visibility and disabled state.
             observation = page.evaluate('''() => {
               const visible = el => !!(el.getClientRects().length) && getComputedStyle(el).visibility !== 'hidden';

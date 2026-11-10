@@ -318,7 +318,8 @@ async def _verify_page(event, fetcher, renderer=None):
             e['raw_snapshot']=store_raw(html)
             e=site_markers(e,html)
             e=recruitment_facts(e,html)
-            known_dynamic=any((urlsplit(e['canonical_url']).hostname or '').endswith(h) for h in ('event-us.kr','holaworld.io','daker.ai','meetup.com','letspl.me','ticketa.co','partiful.com'))
+            from .club_pages import sopt_recruit_page
+            known_dynamic=any((urlsplit(e['canonical_url']).hostname or '').endswith(h) for h in ('event-us.kr','holaworld.io','daker.ai','meetup.com','letspl.me','ticketa.co','partiful.com')) or sopt_recruit_page(e['canonical_url'])
             expired=(parse_date(e.get('apply_deadline'),True) or now())<now() if e.get('apply_deadline') else False
             if renderer and not expired and known_dynamic and e['status'] not in ('CLOSED','DEAD','SOLD_OUT'):
                 try:

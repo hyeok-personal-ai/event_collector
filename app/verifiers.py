@@ -83,6 +83,8 @@ def site_markers(event,html,visible_text=None):
     text=visible_text or soup.get_text(' ',strip=True)
     from .club_dates import club_deadline
     e=club_deadline(e,text)
+    from .club_pages import club_status
+    e=club_status(e,html,visible_text)
     if host.endswith('inflearn.com'):
         from .recruitment import post_content
         indicators=[b.get_text(' ',strip=True) for b in post_content(html,e['canonical_url']).select('button')]
