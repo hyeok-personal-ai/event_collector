@@ -9,6 +9,18 @@ from app.batch_key import read_key
 from app.access_policy import RESTRICTED_SOURCES
 
 class PublicCollectorTests(unittest.TestCase):
+    def test_restricted_sources_cannot_return_through_detail_or_provenance(self):
+        from app.access_policy import assert_event_collection_allowed, RESTRICTED_HOSTS
+        for host in RESTRICTED_HOSTS:
+            for field in ('canonical_url','verification_url','discovery_url'):
+                event={'canonical_url':'https://example.org/event',field:'https://WWW.'+host.upper()+'./detail'}
+                with self.subTest(host=host,field=field),self.assertRaises(ValueError):
+                    assert_event_collection_allowed(event)
+        for source in RESTRICTED_SOURCES:
+            with self.subTest(source=source),self.assertRaises(ValueError):
+                assert_event_collection_allowed({'canonical_url':'https://example.org/event','discovery_source':source})
+        assert_event_collection_allowed({'canonical_url':'https://disquiet.io.example.org/event','discovery_source':'eventus'})
+
     def test_platform_suffix_cannot_turn_every_activity_into_a_contest(self):
         from app.core import activity_type,new_event
         from app.collector import parse_page
