@@ -92,6 +92,7 @@ SOURCES = [
 TECH = re.compile(r'개발|테크|(?<![A-Za-z])AI(?![A-Za-z])|GenAI|LLM|데이터|클라우드|백엔드|해커톤|스터디|소프트웨어|보안|코딩|프로그래|GitHub|AWS|Cloud|DevOps|Python|Spring|(?<![A-Za-z])RAG(?![A-Za-z])|OSS',re.I)
 
 REPAIRS = {
+    'linkareer':dict(url='https://linkareer.com/list/activity?filterBy_interestIDs=13&filterType=INTEREST&orderBy_direction=DESC&orderBy_field=CREATED_AT&page=1',note='공식 과학/공학/기술/IT 관심 분야의 최신 첫 페이지에서 기술 관련 후보를 찾습니다. 전체 대외활동 첫 페이지만 읽던 누락을 수정했습니다. 모든 페이지·교육·공모전·동아리 목록을 수집하는 것은 아닙니다.'),
     'meetup':dict(url='https://www.meetup.com/awskrug/',note='행사 탭의 빈 SSR 대신 공식 그룹 첫 화면의 예정 행사와 Event JSON을 읽습니다.'),
     'aifactory':dict(url='https://aifactory.space/ko/competition',pattern=r'aifactory\.space/(?:ko/|en/)?(?:competitions|competition|task)/\d+',note='새 언어 경로와 복수형 competitions 상세 주소를 지원합니다.'),
     'microsoft':dict(url='https://www.microsoft.com/ko-kr/events',pattern=r'(?:microsoft\.com/[a-z-]+/events/local-events/[^/?]+|events\.microsoft\.com/event/[^?#]+)',keyword=False,note='이전 Events 도메인에서 이동한 공식 지역별 행사 목록을 사용합니다.'),
@@ -273,6 +274,7 @@ async def discover(fetcher, renderer, record, selected=None):
                     return result
                 r=await fetcher.page(s.url)
                 r.raise_for_status()
+                listing_html,listing_url=r.text,str(r.url)
                 if s.id.startswith('github_'):
                     items=[new_event(i['html_url'],i['title'],activity_type='oss_issue',summary=(i.get('body') or '')[:700],provenance=s.id) for i in r.json().get('items',[]) if not i.get('pull_request')]
                 elif s.id=='pytorch':
@@ -295,10 +297,13 @@ async def discover(fetcher, renderer, record, selected=None):
                     if re.search(r'Just a moment|Checking your browser|Access denied',rendered.get('title',''),re.I):
                         raise ValueError('사이트 접근 확인 화면입니다. 차단을 우회하지 않습니다.')
                     items=club_candidates(rendered['html'],rendered['url'],s) if s.club else extract_links(rendered['html'],rendered['url'],s)
+                    listing_html,listing_url=rendered['html'],rendered['url']
                     result['method']='browser'
                 result['count']=len(items)
                 result['state']='ok' if items else 'empty'
-                if not items:result['error']='공개 목록에서 후보를 추출하지 못했습니다. 형식 변경·지역 목록·로그인 여부 확인 필요.'
+                if not items:
+                    listed=len(extract_links(listing_html,listing_url,replace(s,keyword=False))) if s.keyword else 0
+                    result['error']=f'공개 목록 {listed}개를 읽었으나 현재 확인 범위에서 기술 분야 조건에 맞는 후보가 없습니다.' if listed else '공개 목록에서 후보를 추출하지 못했습니다. 형식 변경·지역 목록·로그인 여부 확인 필요.'
                 for e in items:
                     e['discovery_source']=s.id
                     e['discovery_url']=s.url
