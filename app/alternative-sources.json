@@ -39,5 +39,18 @@
       "https://www.dimoa.co.kr/Story/News",
       "https://www.pickcl.com/partner/seminar_event/"
     ]
+  },
+  {
+    "original_url": "https://sipe.team/",
+    "url": "https://sipe.team/recruit",
+    "name": "SIPE 동아리 모집 안내",
+    "provider": "SIPE 공식 모집 페이지",
+    "mode": "alternate",
+    "markers": [
+      "sipe",
+      "지원자격",
+      "서류 접수"
+    ],
+    "reason": "공식 홈페이지의 Recruit 링크로 연결된 모집 상세 페이지입니다. 홈페이지 소개와 분리된 현재 접수 기간·신청 경로를 확인합니다."
   }
 ]

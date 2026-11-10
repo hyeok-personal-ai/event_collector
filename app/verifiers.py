@@ -59,6 +59,12 @@ def external_links(html,base):
     soup=post_content(html,base)
     forms,contacts=[],[]
     links=[a['href'] for a in soup.select('a[href]')]
+    # SIPE's current application lives in the official recruit page navigation.
+    # Community navigation stays excluded: unrelated/global links are not proof.
+    official=urlsplit(base)
+    if official.hostname=='sipe.team' and official.path.rstrip('/')=='/recruit':
+        links += [a['href'] for a in BeautifulSoup(html,'html.parser').select('a[href]')
+                  if re.fullmatch(r'Join Us|지원하기|지원서 작성',a.get_text(' ',strip=True),re.I)]
     # Authors frequently paste a form URL as plain text instead of an anchor.
     links+=re.findall(r'https?://[^\s<>"\u200b]+',soup.get_text(' ',strip=True))
     for link in links:
@@ -75,6 +81,8 @@ def site_markers(event,html,visible_text=None):
     host=urlsplit(e['canonical_url']).hostname or ''
     soup=BeautifulSoup(html,'html.parser')
     text=visible_text or soup.get_text(' ',strip=True)
+    from .club_dates import club_deadline
+    e=club_deadline(e,text)
     if host.endswith('inflearn.com'):
         from .recruitment import post_content
         indicators=[b.get_text(' ',strip=True) for b in post_content(html,e['canonical_url']).select('button')]
