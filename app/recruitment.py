@@ -1,7 +1,9 @@
 """Recruitment facts from individual community posts, never related-card text."""
 import re
+from datetime import datetime, timedelta
 from urllib.parse import urlsplit
 from bs4 import BeautifulSoup
+from .core import KST, now, parse_date
 
 VERSION = 3
 COMMUNITY_HOSTS = ('inflearn.com', 'holaworld.io', 'okky.kr')
@@ -36,6 +38,49 @@ def post_content(html, url):
     return soup
 
 
+def inflearn_recruitment_deadline(main):
+    """Only labelled date-only recruitment ranges; never benefit/activity dates.
+
+    Missing years are anchored to the article's own publication date, not today.
+    Ambiguous ranges and unsupported time expressions remain unparsed.
+    """
+    published = main.select_one('.sub-title__created-at .sub-title__value')
+    posted = None
+    if published:
+        match = re.fullmatch(r'(\d{2}|\d{4})\.(\d{1,2})\.(\d{1,2})\s+\d{2}:\d{2}', published.get_text(strip=True))
+        if match:
+            try:
+                year = int(match[1]) + (2000 if len(match[1]) == 2 else 0)
+                posted = datetime(year, int(match[2]), int(match[3]), tzinfo=KST)
+            except ValueError:
+                pass
+    date = r'(?:(20\d{2})[./-])?(\d{1,2})[./-](\d{1,2})(?:\s*\([월화수목금토일]\))?'
+    pattern = r'(?:모집|지원|접수)\s*기간\s*[:：]\s*' + date + r'\s*[~～–]\s*' + date + r'\s*$'
+    deadlines = set()
+    for line in main.get_text('\n', strip=True).splitlines():
+        match = re.search(pattern, line)
+        if not match:
+            continue
+        sy, sm, sd, ey, em, ed = match.groups()
+        if not sy and not posted:
+            continue
+        try:
+            year = int(sy) if sy else posted.year
+            start = datetime(year, int(sm), int(sd), tzinfo=KST)
+            if not sy:
+                candidates = [start.replace(year=year+delta) for delta in (-1, 0, 1)]
+                start = min(candidates, key=lambda d: abs(d-posted))
+                if abs(start-posted) > timedelta(days=90):
+                    continue
+            endyear = int(ey) if ey else start.year + (int(em) < start.month)
+            end = datetime(endyear, int(em), int(ed), 23, 59, 59, tzinfo=KST)
+            if timedelta(0) <= end-start <= timedelta(days=180):
+                deadlines.add(end.isoformat())
+        except ValueError:
+            continue
+    return next(iter(deadlines)) if len(deadlines) == 1 else None
+
+
 def recruitment_facts(event, html, observation=None):
     e = dict(event)
     if not community_post(e['canonical_url']):
@@ -47,6 +92,9 @@ def recruitment_facts(event, html, observation=None):
         # A crawl-friendly article may omit the platform's recruitment status.
         # Never infer OPEN from its title or a recommended article's badge.
         main = post_content(html, e['canonical_url'])
+        extracted_deadline = inflearn_recruitment_deadline(main)
+        if extracted_deadline and not e.get('apply_deadline'):
+            e['apply_deadline'] = extracted_deadline
         labels = [x.get_text(' ', strip=True) for x in main.select('button')]
         if any(x in ('모집완료', '모집 완료', '모집 마감') for x in labels):
             e.update(status='CLOSED', evidence='인프런 개별 모집글의 모집 완료 표시 확인')
@@ -80,4 +128,7 @@ def recruitment_facts(event, html, observation=None):
         elif any(b.get_text(strip=True)=='지원하기' and not b.has_attr('disabled') and b.get('aria-disabled')!='true' for b in buttons) and any(c.get('label')=='지원하기' and not c.get('disabled') for c in visible):
             e.update(status='OPEN', recruitment_basis='listing', application_url=e['canonical_url'],
                      evidence='HOLA 개별 모집 정보와 현재 보이는 활성 지원하기 버튼 확인. 연락·지원은 원문에서 진행하며 잔여 인원과 선발은 주최자가 결정합니다.')
+    deadline = parse_date(e.get('apply_deadline'), True)
+    if deadline and deadline <= now():
+        e.update(status='CLOSED', evidence='개별 모집글에서 확인한 모집 마감일이 지났습니다. 모집 중 버튼보다 마감일을 우선합니다.')
     return e

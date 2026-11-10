@@ -9,6 +9,31 @@ from app.collector import verify, store_raw
 
 
 class RecruitmentTests(unittest.TestCase):
+    def test_expired_recruitment_range_overrides_stale_open_badge(self):
+        from datetime import datetime
+        from app.core import KST
+        e=new_event('https://www.inflearn.com/studies/123/example','동아리 모집')
+        html='<main><span class="sub-title__created-at"><span class="sub-title__value">26.11.04 01:01</span></span><button>모집중</button><p>문화패스는 11월 30일까지 사용</p><p>📩 모집 기간: 10/26(월) ~ 11.06(금)</p></main>'
+        with patch('app.recruitment.now',return_value=datetime(2026,11,10,tzinfo=KST)):
+            result=recruitment_facts(e,html)
+        self.assertEqual(result['apply_deadline'],'2026-11-06T23:59:59+09:00')
+        self.assertEqual(result['status'],'CLOSED')
+        # A known deadline must also win when the page has no parseable range.
+        with patch('app.recruitment.now',return_value=datetime(2026,11,10,tzinfo=KST)):
+            result=recruitment_facts({**e,'apply_deadline':'2026-11-06'},'<main><button>모집중</button></main>')
+        self.assertEqual(result['status'],'CLOSED')
+
+    def test_recruitment_dates_require_article_context_and_unambiguous_ranges(self):
+        from bs4 import BeautifulSoup
+        from app.recruitment import inflearn_recruitment_deadline
+        def extract(body,posted='26.12.20 10:00'):
+            html=('<span class="sub-title__created-at"><span class="sub-title__value">'+posted+'</span></span>' if posted else '')+body
+            return inflearn_recruitment_deadline(BeautifulSoup(html,'html.parser'))
+        self.assertEqual(extract('<p>접수 기간: 12/20 ~ 01/05</p>'),'2027-01-05T23:59:59+09:00')
+        self.assertEqual(extract('<p>모집 기간: 2026.10.26 ~ 2026.11.06</p>',None),'2026-11-06T23:59:59+09:00')
+        for body,posted in [('<p>활동 기간: 12/20 ~ 01/05</p>','26.12.20 10:00'),('<p>모집 기간: 12/20 ~ 01/05</p>',None),('<p>모집 기간: 12/20 ~ 01/05 18:00</p>','26.12.20 10:00'),('<p>모집 기간: 12/20 ~ 01/05</p><p>모집 기간: 12/20 ~ 01/10</p>','26.12.20 10:00'),('<p>모집 기간: 12/20 ~ 02/30</p>','26.12.20 10:00')]:
+            with self.subTest(body=body,posted=posted):self.assertIsNone(extract(body,posted))
+
     def test_plain_form_link_and_recommendation_scope(self):
         url='https://www.inflearn.com/studies/123/example'
         html='<main><h1>스터디</h1><p>지원 https://forms.gle/actual.</p><a href="https://www.inflearn.com/studies/456/other">다른 글 https://forms.gle/wrong</a></main><footer><a href="https://forms.gle/footer">문의</a></footer>'
