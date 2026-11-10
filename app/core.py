@@ -55,13 +55,21 @@ def categories(text):
     }
     return [k for k, pattern in rules.items() if re.search(pattern, text, re.I)] or ['General']
 
-def activity_type(text):
+def activity_title(text):
+    # Linkareer's shared page suffix describes its site, not this opportunity.
+    return re.sub(r'\s*\|\s*공모전\s*대외활동\s*[-–]\s*링커리어\s*$','',text).strip()
+
+def activity_type(text, fallback='conference'):
+    text=activity_title(text)
+    if re.search(r'베타\s*테스터\s*모집|beta\s*testers?\s*(?:wanted|recruitment)',text,re.I):
+        return 'other'
     for label, pattern in [('club', '동아리|연합 커뮤니티'), ('hackathon', '해커톤|hackathon|대회|공모전|competition'),
-                           ('project', '프로젝트|project'), ('study', '스터디|study'),
-                           ('oss_issue', r'issues/\d+|이슈|번역팀'), ('meetup', '밋업|meetup|모임')]:
+                           ('project', '프로젝트|project'), ('study', r'스터디(?![가-힣])|스터디(?:원|모집)|\bstudy\b'),
+                           ('oss_issue', r'issues/\d+|이슈|번역팀'), ('meetup', '밋업|meetup|모임'),
+                           ('conference', r'컨퍼런스|세미나|특강|강연|포럼|학술|페스티벌|워크숍|행사|\b(?:conference|seminar|forum|festival|workshop)\b')]:
         if re.search(pattern, text, re.I):
             return label
-    return 'conference'
+    return fallback
 
 def score(event):
     text = ' '.join(str(event.get(k) or '') for k in ('title', 'summary', 'tech_stack'))

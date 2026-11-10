@@ -12,7 +12,7 @@ from urllib.robotparser import RobotFileParser
 
 import httpx
 from bs4 import BeautifulSoup
-from .core import canonical, parse_date, now, iso_now, categories, activity_type
+from .core import canonical, parse_date, now, iso_now, categories, activity_type, activity_title
 from .access_policy import assert_collection_allowed, assert_event_collection_allowed
 
 USER_AGENT = 'TechEventRadar/1.0 (+https://github.com/hyeok-personal-ai/event_collector; noncommercial)'
@@ -183,6 +183,8 @@ def parse_page(html, url, previous, observation=None):
             except ValueError:pass
     if len(e['title']) > 90 and previous.get('title') and previous['title'] != urlsplit(url).hostname:
         e['title'] = previous['title']
+    linkareer_detail=(urlsplit(url).hostname or '').removeprefix('www.')=='linkareer.com' and bool(re.fullmatch(r'/activity/\d+/?',urlsplit(url).path))
+    if linkareer_detail:e['title']=activity_title(e['title'])
     if description and description.get('content'):
         e['summary'] = description['content'][:700]
     elif structured.get('description'):
@@ -263,10 +265,10 @@ def parse_page(html, url, previous, observation=None):
     detected_categories = list(dict.fromkeys(previous.get('categories', []) + categories(e['title'] + ' ' + e.get('summary', ''))))
     if len(detected_categories) > 1 and 'General' in detected_categories:
         detected_categories.remove('General')
-    detected_type = activity_type(e['title'])
+    detected_type = activity_type(e['title'],fallback='other' if linkareer_detail else 'conference')
     if re.search(r'github\.com/.+/issues/\d+', url):
         detected_type = 'oss_issue'
-    elif detected_type == 'conference':
+    elif detected_type == 'conference' and not linkareer_detail:
         detected_type = previous.get('activity_type', 'conference')
     e.update(status=status, evidence=evidence, last_verified_at=iso_now(),
              content_hash=hashlib.sha256(text.encode()).hexdigest(),

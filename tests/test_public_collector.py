@@ -9,6 +9,25 @@ from app.batch_key import read_key
 from app.access_policy import RESTRICTED_SOURCES
 
 class PublicCollectorTests(unittest.TestCase):
+    def test_platform_suffix_cannot_turn_every_activity_into_a_contest(self):
+        from app.core import activity_type,new_event
+        from app.collector import parse_page
+        cases=[('AI 콘텐츠 페스티벌 2026','conference'),('AI 서비스 프로젝트 팀원 모집','project'),('2026 AI 해커톤 대회','hackathon'),('Python 스터디 모집','study'),('스터디 플래너 앱 베타 테스터 모집','other')]
+        for title,kind in cases:
+            branded=title+' | 공모전 대외활동-링커리어'
+            with self.subTest(title=title):
+                self.assertEqual(activity_type(branded),kind)
+                url='https://linkareer.com/activity/12345'
+                old=new_event(url,branded,activity_type='hackathon')
+                parsed,_=parse_page('<title>'+branded+'</title>',url,old)
+                self.assertEqual(parsed['title'],title)
+                self.assertEqual(parsed['activity_type'],kind)
+                self.assertEqual(parsed['status'],'CHECK_REQUIRED')
+        self.assertEqual(activity_type('베타 테스트를 준비하는 프로젝트 팀원 모집'),'project')
+        self.assertEqual(activity_type('스터디라이브 숏폼 마케터 1기',fallback='other'),'other')
+        self.assertEqual(activity_type('AI 개발자 추가 모집',fallback='other'),'other')
+        self.assertEqual(activity_type('Python 스터디원 모집',fallback='other'),'study')
+
     def test_filtered_listing_finds_candidates_without_claiming_recruitment(self):
         import httpx
         from urllib.parse import parse_qs,urlsplit

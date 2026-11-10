@@ -210,7 +210,7 @@ def extract_links(html, base_url, source):
             if re.fullmatch(r'Events?|View all events|See all events|Browse events|모든 이벤트|행사 목록|이벤트|행사',title,re.I):continue
             title=re.sub(r'^(모집중|모집완료)\s*','',title)[:180]
             e=new_event(url,title,provenance=source.id,evidence=source.name+' 공개 목록에서 발견. 개별 접수 상태 검증 전.')
-            e['activity_type']='oss_issue' if '/issues/' in url else activity_type(title)
+            e['activity_type']='oss_issue' if '/issues/' in url else activity_type(title,fallback='other' if source.id=='linkareer' else 'conference')
             if '/projects/' in url or source.id=='letspl':e['activity_type']='project'
             if '/studies/' in url:e['activity_type']='study'
             if source.id in ('dacon','daker','aifactory','hackon','devpost','lablab'):e['activity_type']='hackathon'
