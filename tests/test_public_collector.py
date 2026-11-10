@@ -9,6 +9,38 @@ from app.batch_key import read_key
 from app.access_policy import RESTRICTED_SOURCES
 
 class PublicCollectorTests(unittest.TestCase):
+    def test_sideproject_keeps_nontechnical_roles_and_interests(self):
+        import httpx
+        from app.sources import discover
+        class Fetcher:
+            async def page(self,url):
+                html='<a href="/projects/?bmode=view&idx=123">마케터 구성원 모집합니다</a><a href="/projects/?bmode=view&idx=124">문화생활 프로젝트 팀원 모집</a><a href="/projects/?page=2">다음 페이지</a>'
+                return httpx.Response(200,text=html,request=httpx.Request('GET',url))
+        items,results=asyncio.run(discover(Fetcher(),None,lambda r:None,selected={'sideproject'}))
+        self.assertEqual(len(items),2)
+        self.assertEqual((results[0]['state'],results[0]['count']),('ok',2))
+        self.assertTrue(all(e['status']=='CHECK_REQUIRED' and e['discovery_source']=='sideproject' for e in items))
+        self.assertTrue(all('idx=' in e['canonical_url'] for e in items))
+        self.assertEqual([e['activity_type'] for e in items],['project','project'])
+
+    def test_sideproject_titles_keep_explicit_activity_and_do_not_invent_it(self):
+        from app.sources import extract_anchor,search_candidate
+        from app.collector import parse_page
+        s=next(s for s in SOURCES if s.id=='sideproject')
+        url=s.url+'?bmode=view&idx=123'
+        for title,kind in [('마케터 구성원을 모집합니다','project'),('문화생활 프로젝트 팀원 모집','project'),
+                           ('독서 스터디 팀원 모집','study'),('무료 디자인 세미나','conference'),
+                           ('함께하는 저녁 안내','other')]:
+            with self.subTest(title=title):
+                linked=extract_links('<a href="'+url+'">'+title+'</a>',s.url,s)[0]
+                structured=extract_anchor(title,url,s.url,s)
+                searched=search_candidate({'title':title,'url':url})
+                for e in (linked,structured,searched):
+                    self.assertEqual(e['activity_type'],kind)
+                    self.assertEqual(e['status'],'CHECK_REQUIRED')
+                detail,_=parse_page('<title>'+title+'</title>',url,linked)
+                self.assertEqual(detail['activity_type'],kind)
+
     def test_restricted_sources_cannot_return_through_detail_or_provenance(self):
         from app.access_policy import assert_event_collection_allowed, RESTRICTED_HOSTS
         for host in RESTRICTED_HOSTS:

@@ -156,7 +156,7 @@ SOURCES=[replace(s,**REPAIRS.get(s.id,{})) for s in SOURCES]
 SOURCES=[replace(s,enabled=False,note=RETIRED[s.id][0],replacements=RETIRED[s.id][1]) if s.id in RETIRED else s for s in SOURCES]
 SOURCES += [
     Source('startupjobs','StartupJobs · 개발자 행사','행사 플랫폼','https://www.startupjobs.kr/events',r'startupjobs\.kr/events/\d+-[^/?]+',keyword=True,note='국내 행사 보완 소스입니다. 기술 키워드로 거르고 원문에서 개별 검증합니다.'),
-    Source('sideproject','사이드 프로젝트 · 팀원 모집','스터디·프로젝트','https://sideproject.co.kr/projects/',r'sideproject\.co\.kr/projects/?\?.*\bidx=\d+',keyword=True,match_query=True,note='프로젝트 상세 게시물의 idx를 식별합니다. 단순 목록·페이지 이동은 제외합니다.'),
+    Source('sideproject','사이드 프로젝트 · 팀원 모집','스터디·프로젝트','https://sideproject.co.kr/projects/',r'sideproject\.co\.kr/projects/?\?.*\bidx=\d+',match_query=True,note='분야·직무 키워드로 제외하지 않고 공개 목록 첫 페이지의 상세 게시물을 찾습니다. 단순 목록·페이지 이동은 제외하며 모집 상태는 개별 원문에서 검증합니다.'),
     Source('modulabs','모두의연구소 · 모두모임','스터디·프로젝트','https://modulabs.co.kr/community/momos',r'modulabs\.co\.kr/community/momos/\d+$',keyword=True,note='공개 스터디·세미나 모집 목록입니다. 채팅·회원 정보·피드는 수집하지 않습니다.'),
 ]
 
@@ -178,6 +178,13 @@ def source_match(url,source):
     host=(parsed.hostname or '').removeprefix('www.')
     target=host+parsed.path+('?' + parsed.query if source.match_query and parsed.query else '')
     return bool(re.match('^(?:'+source.pattern+')',target,re.I)) if source.pattern else False
+
+def sideproject_activity(title):
+    # A mixed recruitment board also contains talks and community notices.
+    # Team recruitment is a project fallback, not proof of open applications.
+    fallback='project' if re.search(r'(?:팀원|구성원).{0,20}모집',title) else 'other'
+    return activity_type(title,fallback=fallback)
+
 
 def extract_links(html, base_url, source):
     soup=BeautifulSoup(html,'html.parser')
@@ -211,6 +218,7 @@ def extract_links(html, base_url, source):
             title=re.sub(r'^(모집중|모집완료)\s*','',title)[:180]
             e=new_event(url,title,provenance=source.id,evidence=source.name+' 공개 목록에서 발견. 개별 접수 상태 검증 전.')
             e['activity_type']='oss_issue' if '/issues/' in url else activity_type(title,fallback='other' if source.id=='linkareer' else 'conference')
+            if source.id=='sideproject':e['activity_type']=sideproject_activity(title)
             if '/projects/' in url or source.id=='letspl':e['activity_type']='project'
             if '/studies/' in url:e['activity_type']='study'
             if source.id in ('dacon','daker','aifactory','hackon','devpost','lablab'):e['activity_type']='hackathon'
@@ -254,7 +262,9 @@ def extract_anchor(title,href,base,source):
     if not source_match(urljoin(base,href),source):return None
     if source.url and canonical(urljoin(base,href))==canonical(source.url):return None
     if source.keyword and not TECH.search(title):return None
-    try:return new_event(urljoin(base,href),title[:180],provenance=source.id)
+    try:
+        fields={'activity_type':sideproject_activity(title)} if source.id=='sideproject' else {}
+        return new_event(urljoin(base,href),title[:180],provenance=source.id,**fields)
     except ValueError:return None
 
 async def discover(fetcher, renderer, record, selected=None):
@@ -371,7 +381,7 @@ def search_candidate(result):
         if source is None:return None
         title=str(result.get('title') or '')[:180]
         if source.keyword and not TECH.search(title):return None
-        kind='club' if source.club else 'study' if source.id=='inflearn_studies' else 'project' if source.id in ('inflearn_projects','sideproject') else activity_type(title)
+        kind='club' if source.club else 'study' if source.id=='inflearn_studies' else sideproject_activity(title) if source.id=='sideproject' else 'project' if source.id=='inflearn_projects' else activity_type(title)
         return new_event(url,title,activity_type=kind,source=source.name,
                          provenance='web_search',discovery_source=source.id,discovery_url=url,
                          evidence='공개 검색에서 링크를 발견했습니다. 원문과 실제 모집 상태를 검증하기 전입니다.')
