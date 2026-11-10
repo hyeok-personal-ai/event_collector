@@ -104,10 +104,15 @@ REPAIRS = {
     'jumpit':dict(note='텍스트 없는 이미지 배너도 행사 상세 링크를 추출하고 원문에서 제목·접수를 확인합니다.'),
 }
 RETIRED = {
+    'jumpit':('연결된 약관의 정보 복사·타인 제공 제한을 확인했습니다. 적용 범위와 허가 확인 전 수집 보류(2026-11-10).',()),
+    'redis':('이용약관의 자동 수집·스크래핑 금지 확인(2026-11-10). 운영자 허가 전 중지하며 다른 공식 주최자 경로만 검토합니다.',()),
+    'devpost':('이용약관의 자동 접근·스크래핑 제한 확인(2026-11-10). 운영자 허가 전 중지합니다.',()),
+    'devkorea':('이용약관의 스크래핑·대량 다운로드 금지 확인(2026-11-10). 운영자 허가 전 중지합니다.',()),
+    'jetbrains':('이용약관의 데이터 수집·로봇 사용 제한 확인(2026-11-10). 운영자 허가 전 중지합니다.',()),
     'pycon':('2026 공식 주소도 GitHub 서버에서 HTTP 403. Dev-Event와 공개 스터디 목록으로 보완하며 파이콘 공지 전체 수집은 보장하지 않습니다.',('dev_event','modulabs')),
     'onoffmix':('robots.txt에서 자동 수집 금지. 행사 범위는 StartupJobs로 보완하며 온오프믹스 전체를 대신한다고 보장하지 않습니다.',('startupjobs',)),
     'teampik':('사이트 TLS 인증서 만료. 같은 목적의 사이드 프로젝트·모두모임 모집 목록으로 대체합니다.',('sideproject','modulabs')),
-    'wanted':('GitHub 러너에서 robots 확인 HTTP 403. 공개 개발자 행사 목록으로 보완합니다.',('startupjobs','jumpit')),
+    'wanted':('GitHub 러너에서 robots 확인 HTTP 403. 공개 개발자 행사 목록으로 보완합니다.',('startupjobs',)),
     'rocketpunch':('공개 첫 화면 HTTP 403, 행사 전용 목록 확인 불가. StartupJobs로 보완합니다.',('startupjobs',)),
     'linkedin':('robots.txt에서 자동 수집 금지. 공개 행사·커뮤니티 원문으로 보완합니다.',('startupjobs','modulabs')),
     'partiful':('소개 페이지에는 행사 목록이 없고 Explore는 일반 친목 행사 중심입니다. 개발자 행사 목록으로 대체합니다.',('startupjobs',)),

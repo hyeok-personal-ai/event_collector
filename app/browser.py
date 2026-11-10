@@ -47,8 +47,10 @@ class BrowserRenderer:
 
     def _guard(self, route):
         from .collector import public_url
+        from .access_policy import assert_collection_allowed
         request = route.request
         try:
+            assert_collection_allowed(request.url)
             if urlsplit(request.url).scheme not in ('http', 'https'):
                 return route.abort()
             # Viewing public pages must not submit applications, join events, or mutate accounts.

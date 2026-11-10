@@ -47,3 +47,9 @@ GitHub 예약은 정확한 시각이나 매일 실행을 보장하는 타이머�
 탐색은 행사당 40초·후보 최대 4개입니다. 등록된 공식 출처와 연결 링크 내 탐색이며 인터넷 전체 검색은 아닙니다. 확인할 수 없으면 점검 대기로 보내 자동 재시도에서 제외합니다. 일시적인 네트워크 오류는 기존 지연 재시도를 유지합니다. 이미 확인한 경로는 다음 배치에서도 공식 연결과 행사 일치를 재확인하고, 차단된 원문을 다시 호출하지 않습니다. 사전 검토한 행사별 경로는 별도 식별 문구 검사도 유지합니다.
 
 공개 보고에는 `collection_route`로 원래 URL, 실제 확인 URL, 공식 근거 URL, 확인 시각, 시도 결과와 보류 사유를 기록합니다. 실패 시에도 서버가 기존 행사 내용을 보존하며 상태와 경로 기록을 갱신합니다. 프로필이나 비밀키는 포함하지 않습니다. 테스트는 공식 링크 전환, 비공식 출처 거부, 다른 날짜·회차 거부, 경로 재사용과 근거 소실을 검증합니다.
+
+
+## Noncommercial collection and source conditions
+The Radar source-policy page records the 2026-11-10 audit of 61 source entries. A successful HTTP response or robots permission is not a reuse licence. Original post descriptions are not syndicated: public summaries consist of activity/location/price facts. No images, attachments, member lists, or account profiles are published.
+
+Explicit automated-access restrictions on Redis, Devpost, Dev Korea and JetBrains are enforced in both HTTP and browser fetching, including subdomains and redirected/discovered URLs. Jumpit is held pending clarification of the linked terms. Disabled sources with no authorized alternative remain excluded; an unrelated directory is not presented as the same-event replacement. Rights holders may request removal/correction by opening an issue containing only the public URL and reason, without private personal information.

@@ -12,8 +12,9 @@ from urllib.robotparser import RobotFileParser
 import httpx
 from bs4 import BeautifulSoup
 from .core import canonical, parse_date, now, iso_now, categories, activity_type
+from .access_policy import assert_collection_allowed
 
-USER_AGENT = 'TechEventRadar/0.1 (+local personal event organizer)'
+USER_AGENT = 'TechEventRadar/1.0 (+https://github.com/hyeok-personal-ai/event_collector; noncommercial)'
 DEV_EVENT_URL = 'https://raw.githubusercontent.com/brave-people/Dev-Event/master/README.md'
 
 async def public_url(url):
@@ -60,6 +61,7 @@ class Fetcher:
         raise ValueError('리다이렉트 횟수를 초과했습니다.')
 
     async def allowed(self, url):
+        assert_collection_allowed(url)
         p = urlsplit(url)
         origin = f'{p.scheme}://{p.netloc}'
         if origin not in self.robots:
