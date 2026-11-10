@@ -104,19 +104,30 @@ REPAIRS = {
     'jumpit':dict(note='텍스트 없는 이미지 배너도 행사 상세 링크를 추출하고 원문에서 제목·접수를 확인합니다.'),
 }
 RETIRED = {
+    'hola':('제7조의 동의 없는 타인 제공 제한과 제9조 작성자 저작권을 확인했습니다. 비상업 공개 검색 색인 허가 여부가 명확해질 때까지 자동 수집·공개 표시를 보류합니다.',()),
+    'letspl':('책임한계와 법적고지의 사전동의 없는 전재·복제·제3자 제공 제한을 확인했습니다. 공개 색인 허가 범위 확인 전 보류합니다.',()),
+    'lablab':('Restrictions 5.B의 명시적 허가 없는 콘텐츠 공개·재배포와 사용자 데이터 수집 제한을 확인했습니다. 허가 전 보류.',()),
+    'aws':('LICENSE AND SITE ACCESS의 데이터마이닝·로봇·유사 정보 추출 도구 제외를 확인했습니다. 허가 전 자동 수집 중지.',()),
+    'microsoft':('개인·비상업 이용 제한과 정보 복사·배포·게시 제한을 확인했습니다. 행사 목록 공개 색인 허가 확인 전 보류.',()),
+    'nvidia':('사이트 이용 제한 (f)의 로봇·스크래퍼·크롤러·정보 추출 도구 제한 확인. 허가 전 자동 수집 중지.',()),
+    'mongodb':('Copyrights의 서면 허가 없는 복사·재배포 금지와 개인·교육·비상업 이용에도 다른 매체 재배포 제한을 확인했습니다. 공개 색인 허가 확인 전 보류.',()),
+    'redhat':('제1항의 자료별 라이선스 준수와 무표시 자료의 개인·내부 업무 복사 허용 범위를 확인했습니다. 공개 제공까지 허용됐다고 보지 않으며 확인 전 보류.',()),
+    'oracle':('제7항의 사전 서면허가 없는 로봇·스크래퍼 자동 접근 제한 확인. 허가 전 자동 수집 중지.',()),
+    'startupjobs':('Part B 제6항은 개인 비상업 이용만 허용하고 데이터베이스의 체계적 다운로드·복사를 제한합니다. 반복 배치 수집 중지.',()),
+    'modulabs':('제28조의 권리 있는 정보 복제·제3자 제공 제한은 영리·비영리를 모두 포함합니다. 공개 색인 허가 범위 확인 전 보류.',()),
     'jumpit':('연결된 약관의 정보 복사·타인 제공 제한을 확인했습니다. 적용 범위와 허가 확인 전 수집 보류(2026-11-10).',()),
     'redis':('이용약관의 자동 수집·스크래핑 금지 확인(2026-11-10). 운영자 허가 전 중지하며 다른 공식 주최자 경로만 검토합니다.',()),
     'devpost':('이용약관의 자동 접근·스크래핑 제한 확인(2026-11-10). 운영자 허가 전 중지합니다.',()),
     'devkorea':('이용약관의 스크래핑·대량 다운로드 금지 확인(2026-11-10). 운영자 허가 전 중지합니다.',()),
     'jetbrains':('이용약관의 데이터 수집·로봇 사용 제한 확인(2026-11-10). 운영자 허가 전 중지합니다.',()),
-    'pycon':('2026 공식 주소도 GitHub 서버에서 HTTP 403. Dev-Event와 공개 스터디 목록으로 보완하며 파이콘 공지 전체 수집은 보장하지 않습니다.',('dev_event','modulabs')),
-    'onoffmix':('robots.txt에서 자동 수집 금지. 행사 범위는 StartupJobs로 보완하며 온오프믹스 전체를 대신한다고 보장하지 않습니다.',('startupjobs',)),
-    'teampik':('사이트 TLS 인증서 만료. 같은 목적의 사이드 프로젝트·모두모임 모집 목록으로 대체합니다.',('sideproject','modulabs')),
-    'wanted':('GitHub 러너에서 robots 확인 HTTP 403. 공개 개발자 행사 목록으로 보완합니다.',('startupjobs',)),
-    'rocketpunch':('공개 첫 화면 HTTP 403, 행사 전용 목록 확인 불가. StartupJobs로 보완합니다.',('startupjobs',)),
-    'linkedin':('robots.txt에서 자동 수집 금지. 공개 행사·커뮤니티 원문으로 보완합니다.',('startupjobs','modulabs')),
-    'partiful':('소개 페이지에는 행사 목록이 없고 Explore는 일반 친목 행사 중심입니다. 개발자 행사 목록으로 대체합니다.',('startupjobs',)),
-    'disquiet':('개편된 홈은 제품·일반 게시글 중심이며 프로젝트 모집 전용 목록이 아닙니다. 실제 모집 목록으로 대체합니다.',('sideproject','modulabs')),
+    'pycon':('2026 공식 주소도 GitHub 서버에서 HTTP 403. Dev-Event와 공개 스터디 목록으로 보완하며 파이콘 공지 전체 수집은 보장하지 않습니다.',('dev_event',)),
+    'onoffmix':('robots.txt에서 자동 수집 금지. 행사 범위는 Dev-Event의 허용된 공식 원문으로 보완하며 온오프믹스 전체를 대신한다고 보장하지 않습니다.',('dev_event',)),
+    'teampik':('사이트 TLS 인증서 만료. 사이드 프로젝트 모집 목록으로 보완합니다.',('sideproject',)),
+    'wanted':('GitHub 러너에서 robots 확인 HTTP 403. 공개 개발자 행사 목록으로 보완합니다.',('dev_event',)),
+    'rocketpunch':('공개 첫 화면 HTTP 403, 행사 전용 목록 확인 불가. Dev-Event의 허용된 공식 원문으로 보완합니다.',('dev_event',)),
+    'linkedin':('robots.txt에서 자동 수집 금지. 공개 행사·커뮤니티 원문으로 보완합니다.',('dev_event',)),
+    'partiful':('소개 페이지에는 행사 목록이 없고 Explore는 일반 친목 행사 중심입니다. 개발자 행사 목록으로 대체합니다.',('dev_event',)),
+    'disquiet':('개편된 홈은 제품·일반 게시글 중심이며 프로젝트 모집 전용 목록이 아닙니다. 실제 모집 목록으로 대체합니다.',('sideproject',)),
 }
 SOURCES=[replace(s,**REPAIRS.get(s.id,{})) for s in SOURCES]
 SOURCES=[replace(s,enabled=False,note=RETIRED[s.id][0],replacements=RETIRED[s.id][1]) if s.id in RETIRED else s for s in SOURCES]
@@ -125,6 +136,8 @@ SOURCES += [
     Source('sideproject','사이드 프로젝트 · 팀원 모집','스터디·프로젝트','https://sideproject.co.kr/projects/',r'sideproject\.co\.kr/projects/?\?.*\bidx=\d+',keyword=True,match_query=True,note='프로젝트 상세 게시물의 idx를 식별합니다. 단순 목록·페이지 이동은 제외합니다.'),
     Source('modulabs','모두의연구소 · 모두모임','스터디·프로젝트','https://modulabs.co.kr/community/momos',r'modulabs\.co\.kr/community/momos/\d+$',keyword=True,note='공개 스터디·세미나 모집 목록입니다. 채팅·회원 정보·피드는 수집하지 않습니다.'),
 ]
+
+SOURCES=[replace(s,enabled=False,note=RETIRED[s.id][0],replacements=RETIRED[s.id][1]) if s.id in RETIRED else s for s in SOURCES]
 
 def catalog():
     return [{**asdict(s),'replacements':list(s.replacements)} for s in SOURCES]

@@ -37,7 +37,7 @@ class RemoteQueue:
                 await asyncio.sleep(2**attempt)
 
 
-async def collect(force=False, verify_limit=1000, dynamic_budget=64, time_budget=1800, cleanup_timeout=15):
+async def collect(force=False, verify_limit=1000, dynamic_budget=160, time_budget=1800, cleanup_timeout=15):
     if SITE != 'https://tech-event-radar-kr.qkdrhkgn123.chatgpt.site':
         raise RuntimeError('RADAR_SITE_URL must match the approved Radar backend')
     run_id = os.environ.get('GITHUB_RUN_ID')

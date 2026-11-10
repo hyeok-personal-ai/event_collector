@@ -53,3 +53,9 @@ GitHub 예약은 정확한 시각이나 매일 실행을 보장하는 타이머�
 The Radar source-policy page records the 2026-11-10 audit of 61 source entries. A successful HTTP response or robots permission is not a reuse licence. Original post descriptions are not syndicated: public summaries consist of activity/location/price facts. No images, attachments, member lists, or account profiles are published.
 
 Explicit automated-access restrictions on Redis, Devpost, Dev Korea and JetBrains are enforced in both HTTP and browser fetching, including subdomains and redirected/discovered URLs. Jumpit is held pending clarification of the linked terms. Disabled sources with no authorized alternative remain excluded; an unrelated directory is not presented as the same-event replacement. Rights holders may request removal/correction by opening an issue containing only the public URL and reason, without private personal information.
+
+
+### 2026-11-10 모집 후보 재검증
+개별 모집글의 현재 모집 표시와 신청폼 응답 가능 검증을 구분합니다. 제목의 ‘모집’만으로 OPEN을 판정하지 않으며 관련 글의 버튼·링크도 근거에서 제외합니다. 본문에 텍스트로 붙인 신청폼 URL도 확인하되 로그인·사람 확인은 우회하지 않습니다. 삭제된 개별 커뮤니티 글의 HTTP 404/410은 종료 대상으로 빼고 점검 대기를 반복하지 않습니다. 기존 미확정 후보는 새 판정 버전으로 한 번 재검증하며, 브라우저 예산이 소진된 후보는 다음 날 다시 확인합니다. 하루 배치와 30분 실행 예산은 유지합니다.
+
+조건 검토 기록은 61곳 중 30곳이며 31곳은 추가 확인이 필요합니다. 이번에 HOLA·렛플·lablab·AWS·Microsoft·NVIDIA·MongoDB·Red Hat·Oracle·StartupJobs·모두의연구소 11곳을 추가 보류했습니다. 명시적 자동 수집 금지와 공개 재사용 허가 범위 미확정을 구분해서 기록하며, 검토 완료 자체가 이용 허락을 뜻하지 않습니다. HOLA 모집 버튼 파서는 준비되어 있으나 허가 확인 전 수집·공개하지 않습니다. 원문 HTML 보관은 기본 해제(`RADAR_STORE_RAW=1` 개발 점검에서만 선택). 기존 원문 전문을 공개하지 않습니다.

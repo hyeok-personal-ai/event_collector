@@ -5,6 +5,7 @@ import json
 import re
 import socket
 import gzip
+import os
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 from urllib.robotparser import RobotFileParser
@@ -133,6 +134,7 @@ def json_nodes(value):
 def parse_page(html, url, previous, observation=None):
     soup = BeautifulSoup(html, 'html.parser')
     e = dict(previous)
+    e.pop('recruitment_basis', None)
     nodes = []
     for script in soup.select('script[type="application/ld+json"]'):
         try:
@@ -269,6 +271,8 @@ def parse_page(html, url, previous, observation=None):
     return e, text[:12000]
 
 def store_raw(html):
+    # Production keeps extracted facts and a hash, not copies of members' posts.
+    if os.environ.get('RADAR_STORE_RAW') != '1':return None
     digest=hashlib.sha256(html.encode()).hexdigest()
     folder=Path(__file__).resolve().parent.parent/'data'/'raw'
     folder.mkdir(parents=True,exist_ok=True)
@@ -287,6 +291,7 @@ async def _verify_page(event, fetcher, renderer=None):
     raw=''
     try:
         from .verifiers import verify_github, site_markers, check_external
+        from .recruitment import recruitment_facts, VERSION
         if e.get('activity_type')=='oss_issue' and 'github.com/' in e['canonical_url']:
             result=await verify_github(e,fetcher)
             if result:return result,result.get('summary','')
@@ -304,6 +309,7 @@ async def _verify_page(event, fetcher, renderer=None):
             e['verification_method']='http'
             e['raw_snapshot']=store_raw(html)
             e=site_markers(e,html)
+            e=recruitment_facts(e,html)
             known_dynamic=any((urlsplit(e['canonical_url']).hostname or '').endswith(h) for h in ('event-us.kr','holaworld.io','daker.ai','meetup.com','letspl.me','ticketa.co','partiful.com'))
             expired=(parse_date(e.get('apply_deadline'),True) or now())<now() if e.get('apply_deadline') else False
             if renderer and not expired and known_dynamic and e['status'] not in ('CLOSED','DEAD','SOLD_OUT'):
@@ -316,6 +322,7 @@ async def _verify_page(event, fetcher, renderer=None):
                     html=page['html']
                     e,raw=parse_page(html,page['url'],e,observation=page)
                     e=site_markers(e,html,page['text'])
+                    e=recruitment_facts(e,html,page)
                     e.update(verification_method='browser',raw_snapshot=store_raw(html))
                 except Exception as exc:
                     e['browser_error']=str(exc)[:300]
@@ -323,6 +330,8 @@ async def _verify_page(event, fetcher, renderer=None):
                 e=await check_external(e,html,renderer,fetcher)
             e['failure_count']=0
             e['error_kind']=None
+            deferred='한도에 도달' in e.get('browser_error','') or any('한도에 도달' in c.get('evidence','') for c in e.get('application_checks',[]))
+            e['verification_version']=1 if deferred else VERSION
     except (httpx.HTTPError, ValueError, OSError, KeyError, TypeError) as exc:
         e.update(status='CHECK_REQUIRED', evidence=str(exc) or type(exc).__name__,
                  failure_count=event.get('failure_count',0)+1,error_kind='access' if 'robots' in str(exc) else 'network')
@@ -344,6 +353,13 @@ async def verify(event, fetcher, renderer=None):
         if previous.get('state')=='alternate':
             return await resolve(event,fetcher,renderer,_verify_page,event)
         result,raw=await _verify_page(event,fetcher,renderer)
+        # A deleted individual community post has no annual-event replacement.
+        # Preserve its explicit HTTP 404/410 verdict instead of an endless review.
+        from .recruitment import community_post
+        if result.get('status')=='DEAD' and community_post(event['canonical_url']):
+            result.update(failure_count=0, verification_version=2)
+            result['collection_route']=routing(event,'direct',event['canonical_url'],reason='개별 모집글 삭제(HTTP 404/410) 확인 · 수집 종료')
+            return result,raw
         if needs_alternative(result,event):
             return await resolve(event,fetcher,renderer,_verify_page,result)
         result['collection_route']=routing(event,'direct',event['canonical_url'],reason='등록 원문 확인' if not result.get('failure_count') else '일시적 오류 · 지연 재시도')

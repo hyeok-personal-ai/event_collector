@@ -14,7 +14,7 @@ class PublicCollectorTests(unittest.TestCase):
         for s in SOURCES:
             if not s.enabled:
                 self.assertTrue(s.note)
-                self.assertTrue(s.replacements or s.id in {'redis','devpost','devkorea','jetbrains','jumpit'}, 'Excluded sources need an active alternative or an explicit policy restriction')
+                self.assertTrue(s.replacements or s.id in {'redis','devpost','devkorea','jetbrains','jumpit','hola','letspl','nvidia','aws','oracle','mongodb','microsoft','redhat','lablab','startupjobs','modulabs'}, 'Excluded sources need an active alternative or an explicit policy restriction')
             for replacement in s.replacements:
                 self.assertTrue(sources[replacement].enabled)
 

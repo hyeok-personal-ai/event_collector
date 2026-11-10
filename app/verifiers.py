@@ -26,10 +26,14 @@ def form_state(observation):
 
 def external_links(html,base):
     from urllib.parse import urljoin
-    soup=BeautifulSoup(html,'html.parser')
+    from .recruitment import post_content
+    soup=post_content(html,base)
     forms,contacts=[],[]
-    for a in soup.select('a[href]'):
-        url=urljoin(base,a['href'])
+    links=[a['href'] for a in soup.select('a[href]')]
+    # Authors frequently paste a form URL as plain text instead of an anchor.
+    links+=re.findall(r'https?://[^\s<>"\u200b]+',soup.get_text(' ',strip=True))
+    for link in links:
+        url=urljoin(base,link.rstrip('.,;!?)）]'))
         try:url=canonical(url)
         except ValueError:continue
         if FORM_LINK.search(url) and url not in forms:forms.append(url)
@@ -43,7 +47,8 @@ def site_markers(event,html,visible_text=None):
     soup=BeautifulSoup(html,'html.parser')
     text=visible_text or soup.get_text(' ',strip=True)
     if host.endswith('inflearn.com'):
-        indicators=[b.get_text(' ',strip=True) for b in soup.select('button')]
+        from .recruitment import post_content
+        indicators=[b.get_text(' ',strip=True) for b in post_content(html,e['canonical_url']).select('button')]
         if '모집완료' in indicators or '모집 완료' in indicators:
             e.update(status='CLOSED',evidence='인프런 개별 모집글의 모집완료 표시 확인')
         elif '모집중' in indicators:
@@ -91,7 +96,7 @@ async def check_external(e,html,renderer,fetcher):
     if forms:
         states={c['status'] for c in e['application_checks']}
         if states=={'OPEN'} and e.get('status') not in ('CLOSED','DEAD','SOLD_OUT'):
-            e.update(status='WAITLIST' if e['status']=='WAITLIST' else 'OPEN',evidence=e['evidence']+' / '+e['application_checks'][0]['evidence'])
+            e.update(status='WAITLIST' if e['status']=='WAITLIST' else 'OPEN',recruitment_basis='application',evidence=e['evidence']+' / '+e['application_checks'][0]['evidence'])
         elif states=={'CLOSED'}:
             e.update(status='CLOSED',evidence='확인한 신청폼이 모두 접수 종료 상태입니다.')
         else:
