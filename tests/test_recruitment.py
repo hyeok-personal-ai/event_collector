@@ -44,6 +44,17 @@ class RecruitmentTests(unittest.TestCase):
         html='<main><h1>스터디</h1><p>지원 https://forms.gle/actual.</p><a href="https://www.inflearn.com/studies/456/other">다른 글 https://forms.gle/wrong</a></main><footer><a href="https://forms.gle/footer">문의</a></footer>'
         self.assertEqual(external_links(html,url),(['https://forms.gle/actual'],[]))
 
+    def test_labelled_single_deadlines_and_split_labels(self):
+        from bs4 import BeautifulSoup
+        from app.recruitment import inflearn_recruitment_deadline
+        def extract(body):
+            return inflearn_recruitment_deadline(BeautifulSoup('<time datetime="2026-11-04T12:00:00+09:00"></time>'+body,'html.parser'))
+        self.assertEqual(extract('<p>- 지원기간: 26년 11월 14일까지</p>'),'2026-11-14T23:59:59+09:00')
+        self.assertEqual(extract('<b>- 모집 기간</b><p>: ~11/20 (금)까지</p>'),'2026-11-20T23:59:59+09:00')
+        self.assertEqual(extract('<p>접수 마감: 2026년 11월 14일까지</p>'),'2026-11-14T23:59:59+09:00')
+        for body in ['<p>활동 기간: 26년 11월 14일까지</p>', '<p>지원 기간: ~2026년</p>', '<p>모집 기간: ~11/20 (일)까지</p>', '<p>모집 기간: 26년 11월 14일 18시까지</p>', '<p>모집 기간: 26년 11월 14일까지</p><p>지원 기간: 26년 11월 15일까지</p>']:
+            with self.subTest(body=body):self.assertIsNone(extract(body))
+
     def test_title_and_related_open_badge_do_not_confirm_recruitment(self):
         e=new_event('https://www.inflearn.com/projects/123/example','모집 중 프로젝트')
         e['status']='CHECK_REQUIRED'

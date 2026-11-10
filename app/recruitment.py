@@ -39,7 +39,7 @@ def post_content(html, url):
 
 
 def inflearn_recruitment_deadline(main):
-    """Only labelled date-only recruitment ranges; never benefit/activity dates.
+    """Only labelled date-only recruitment ranges/deadlines, not activity dates.
 
     Missing years are anchored to the article's own publication date, not today.
     Ambiguous ranges and unsupported time expressions remain unparsed.
@@ -58,14 +58,38 @@ def inflearn_recruitment_deadline(main):
                 posted = datetime(year, int(match[2]), int(match[3]), tzinfo=KST)
             except ValueError:
                 pass
-    date = r'(?:(20\d{2})[./-])?(\d{1,2})[./-](\d{1,2})(?:\s*\([월화수목금토일]\))?'
+    date = r'(?:(20\d{2})[./-])?(\d{1,2})[./-](\d{1,2})(?:\s*\(([월화수목금토일])\))?'
     pattern = r'(?:모집|지원|접수)\s*기간\s*[:：]\s*' + date + r'\s*[~～–]\s*' + date + r'\s*$'
+    single = r'(?:모집|지원|접수)\s*(?:기간|마감)\s*[:：]\s*(?:~\s*)?(?:(20\d{2}|\d{2})년\s*)?(\d{1,2})월\s*(\d{1,2})일\s*(?:\(([월화수목금토일])\))?\s*까지\s*$'
+    numeric_single = r'(?:모집|지원|접수)\s*(?:기간|마감)\s*[:：]\s*(?:~\s*)?' + date + r'\s*까지\s*$'
     deadlines = set()
-    for line in main.get_text('\n', strip=True).splitlines():
+    lines = main.get_text('\n', strip=True).splitlines()
+    # Join only a standalone field label and its immediate value, never prose.
+    lines = [line+' '+lines[i+1] if re.search(r'(?:모집|지원|접수)\s*(?:기간|마감)\s*[:：]?\s*$',line) and i+1<len(lines) else line for i,line in enumerate(lines)]
+    def weekday_matches(value, weekday):
+        return not weekday or '월화수목금토일'[value.weekday()] == weekday
+    for line in lines:
         match = re.search(pattern, line)
         if not match:
+            one = re.search(single, line) or re.search(numeric_single, line)
+            if one:
+                year, month, day, weekday = one.groups()
+                if not year and not posted:
+                    continue
+                try:
+                    y = int(year) + (2000 if len(year)==2 else 0) if year else posted.year
+                    end = datetime(y,int(month),int(day),23,59,59,tzinfo=KST)
+                    if not year:
+                        end = min([end.replace(year=y+d) for d in (-1,0,1)],key=lambda d:abs(d-posted))
+                        if abs(end-posted)>timedelta(days=90):
+                            continue
+                    if not weekday_matches(end,weekday):
+                        return None  # A contradictory weekday makes this field ambiguous.
+                    deadlines.add(end.isoformat())
+                except ValueError:
+                    continue
             continue
-        sy, sm, sd, ey, em, ed = match.groups()
+        sy, sm, sd, sw, ey, em, ed, ew = match.groups()
         if not sy and not posted:
             continue
         try:
@@ -78,6 +102,8 @@ def inflearn_recruitment_deadline(main):
                     continue
             endyear = int(ey) if ey else start.year + (int(em) < start.month)
             end = datetime(endyear, int(em), int(ed), 23, 59, 59, tzinfo=KST)
+            if not weekday_matches(start,sw) or not weekday_matches(end,ew):
+                return None
             if timedelta(0) <= end-start <= timedelta(days=180):
                 deadlines.add(end.isoformat())
         except ValueError:
