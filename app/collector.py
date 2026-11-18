@@ -110,16 +110,19 @@ class Fetcher:
         if parser and not parser.can_fetch(USER_AGENT, url):
             raise ValueError('robots.txt에서 자동 수집을 허용하지 않습니다.')
 
-    async def github_api(self, url):
+    async def github_api(self, url, *, raw=False):
         """Read the documented GitHub REST API with its own access and rate limits."""
         parsed = urlsplit(url)
         issue_path = r'/repos/(?:apache/airflow|explyt/spring-plugin)/issues/\d+(?:/(?:comments|timeline))?'
+        from .official_programs import CNCF_API, CNCF_PATH, CNCF_TREE
+        program_document = url.startswith(CNCF_API) and re.fullmatch(CNCF_PATH, url[len(CNCF_API):])
         if parsed.scheme != 'https' or parsed.netloc != 'api.github.com' or not (
-            parsed.path == '/search/issues' or re.fullmatch(issue_path, parsed.path)
+            (raw and program_document) or (not raw and (
+                url == CNCF_TREE or parsed.path == '/search/issues' or re.fullmatch(issue_path, parsed.path)))
         ):
             raise ValueError('지원하지 않는 GitHub API 주소')
         assert_collection_allowed(url)
-        headers = {'Accept': 'application/vnd.github+json'}
+        headers = {'Accept': 'application/vnd.github.raw+json' if raw else 'application/vnd.github+json'}
         token = os.environ.get('RADAR_GITHUB_API_TOKEN')
         if token:
             headers['Authorization'] = 'Bearer ' + token
@@ -323,6 +326,10 @@ async def _verify_page(event, fetcher, renderer=None):
         e['needs_recheck']=False
     raw=''
     try:
+        from .official_programs import verify_program
+        program = await verify_program(e, fetcher)
+        if program is not None:
+            return program, ''
         from .verifiers import verify_github, site_markers, check_external
         from .recruitment import recruitment_facts, VERSION
         if e.get('activity_type')=='oss_issue' and 'github.com/' in e['canonical_url']:

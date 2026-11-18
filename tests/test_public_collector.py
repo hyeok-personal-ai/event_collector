@@ -51,7 +51,7 @@ class PublicCollectorTests(unittest.TestCase):
         for source in RESTRICTED_SOURCES:
             with self.subTest(source=source),self.assertRaises(ValueError):
                 assert_event_collection_allowed({'canonical_url':'https://example.org/event','discovery_source':source})
-        assert_event_collection_allowed({'canonical_url':'https://disquiet.io.example.org/event','discovery_source':'eventus'})
+        assert_event_collection_allowed({'canonical_url':'https://disquiet.io.example.org/event','discovery_source':'dale_programs'})
 
     def test_platform_suffix_cannot_turn_every_activity_into_a_contest(self):
         from app.core import activity_type,new_event
@@ -106,7 +106,7 @@ class PublicCollectorTests(unittest.TestCase):
         for s in SOURCES:
             if not s.enabled:
                 self.assertTrue(s.note)
-                self.assertTrue(s.replacements or s.id in RESTRICTED_SOURCES, 'Excluded sources need an active alternative or an explicit policy restriction')
+                self.assertTrue(s.note, 'Excluded sources need a documented reason even when no permitted alternative exists')
             for replacement in s.replacements:
                 self.assertTrue(sources[replacement].enabled)
 

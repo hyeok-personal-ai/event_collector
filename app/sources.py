@@ -6,10 +6,11 @@ import re
 from dataclasses import dataclass, asdict, replace
 from urllib.parse import urljoin, urlsplit
 from bs4 import BeautifulSoup
-from .core import new_event, canonical, categories, activity_type, iso_now
+from .core import new_event, canonical, categories, activity_type, iso_now, now
 from .importers import parse_dev_event
 from .collector import DEV_EVENT_URL, json_nodes
 from .access_policy import assert_collection_allowed
+from .official_programs import CNCF_DOCS, CNCF_PATH, CNCF_TREE, DALE_URL, cncf_paths, dale_is_open, dale_listing
 
 @dataclass(frozen=True)
 class Source:
@@ -106,6 +107,9 @@ REPAIRS = {
     'jumpit':dict(note='텍스트 없는 이미지 배너도 행사 상세 링크를 추출하고 원문에서 제목·접수를 확인합니다.'),
 }
 RETIRED = {
+    'eventus':('이용약관 제13조의 사전 승낙 없는 비영리 포함 복제·제3자 제공 제한을 확인했습니다. 허가 전 목록·개별 행사 자동 수집을 보류합니다.',()),
+    'luma':('공식 API는 권한이 있는 Luma Plus 캘린더의 키가 필요합니다. Discover·개별 행사 자동 색인 허가를 확인할 때까지 보류합니다.',()),
+    'openai':('공식 커뮤니티 행사의 현재 목록 경로가 Luma입니다. 권한 있는 공식 수집 경로를 확보할 때까지 보류합니다.',()),
     'government':('K-Startup 이용약관 제14조 제2항의 사전 승낙 없는 정보 복제·타인 제공 제한 확인. 해당 경로의 공개 색인 허가 확인 전 수집을 보류합니다.',()),
     'dev_event':('공식 LICENSE·USAGE_POLICY의 무단 대량 수집·파생 서비스 제작 제한 확인. 서면 허가 전 목록 수집 중지.',()),
     'hola':('제7조의 동의 없는 타인 제공 제한과 제9조 작성자 저작권을 확인했습니다. 비상업 공개 검색 색인 허가 여부가 명확해질 때까지 자동 수집·공개 표시를 보류합니다.',()),
@@ -124,7 +128,7 @@ RETIRED = {
     'devpost':('이용약관의 자동 접근·스크래핑 제한 확인(2026-11-10). 운영자 허가 전 중지합니다.',()),
     'devkorea':('이용약관의 스크래핑·대량 다운로드 금지 확인(2026-11-10). 운영자 허가 전 중지합니다.',()),
     'jetbrains':('이용약관의 데이터 수집·로봇 사용 제한 확인(2026-11-10). 운영자 허가 전 중지합니다.',()),
-    'pycon':('2026 공식 주소도 GitHub 서버에서 HTTP 403. 이벤터스 공개 목록으로 보완하며 파이콘 공지 전체 수집은 보장하지 않습니다.',('eventus',)),
+    'pycon':('2026 공식 주소도 GitHub 서버에서 HTTP 403. 허용된 공식 대체 목록을 찾지 못했습니다.',()),
     'onoffmix':('robots.txt에서 자동 수집 금지. 행사 범위는 이벤터스의 개별 원문으로 보완하며 온오프믹스 전체를 대신한다고 보장하지 않습니다.',('eventus',)),
     'teampik':('사이트 TLS 인증서 만료. 사이드 프로젝트 모집 목록으로 보완합니다.',('sideproject',)),
     'wanted':('2026-08-06 약관 제19조 제2·7항의 제3자 제공 및 자동 수집 제한 확인. 허가 전 직접 수집과 검색 경유 수집을 보류합니다.',()),
@@ -155,6 +159,12 @@ RETIRED.update({'onoffmix': ('제14조 제8항 제7호의 사전 승낙 없는 �
 SOURCES=[replace(s,**REPAIRS.get(s.id,{})) for s in SOURCES]
 SOURCES=[replace(s,enabled=False,note=RETIRED[s.id][0],replacements=RETIRED[s.id][1]) if s.id in RETIRED else s for s in SOURCES]
 SOURCES += [
+    Source('dale_programs','달레 스터디 공식 프로그램','스터디·프로젝트',DALE_URL,
+           r'dalestudy\.com/programs/[a-z0-9-]+$',adapter='dale_programs',
+           note='공식 사이트 소스 MIT 라이선스 및 검색 색인 허용. 공개 목록의 프로그램명·모집 표시·링크만 수집합니다.'),
+    Source('cncf_mentoring','CNCF LFX 멘토링','스터디·프로젝트',CNCF_TREE,
+           r'github\.com/cncf/mentoring/blob/main/'+CNCF_PATH+'$',adapter='cncf_mentoring',
+           note='공식 Apache-2.0 저장소의 멘티 지원 기간만, 공식 GitHub API로 확인합니다.'),
     Source('startupjobs','StartupJobs · 개발자 행사','행사 플랫폼','https://www.startupjobs.kr/events',r'startupjobs\.kr/events/\d+-[^/?]+',keyword=True,note='국내 행사 보완 소스입니다. 기술 키워드로 거르고 원문에서 개별 검증합니다.'),
     Source('sideproject','사이드 프로젝트 · 팀원 모집','스터디·프로젝트','https://sideproject.co.kr/projects/',r'sideproject\.co\.kr/projects/?\?.*\bidx=\d+',match_query=True,note='분야·직무 키워드로 제외하지 않고 공개 목록 첫 페이지의 상세 게시물을 찾습니다. 단순 목록·페이지 이동은 제외하며 모집 상태는 개별 원문에서 검증합니다.'),
     Source('modulabs','모두의연구소 · 모두모임','스터디·프로젝트','https://modulabs.co.kr/community/momos',r'modulabs\.co\.kr/community/momos/\d+$',keyword=True,note='공개 스터디·세미나 모집 목록입니다. 채팅·회원 정보·피드는 수집하지 않습니다.'),
@@ -275,12 +285,29 @@ async def discover(fetcher, renderer, record, selected=None):
             result={'id':s.id,'name':s.name,'group':s.group,'url':s.url,'count':0,'method':'http','state':'running','error':None}
             try:
                 if not s.enabled:
-                    result.update(state='disabled',method='policy',error=s.note,checked_at=iso_now())
-                    record(result)
+                    result.update(state='disabled',method='policy',error=s.note)
                     return result
                 if not s.url:
                     result.update(state='missing',method='none',error='구체적인 공개 목록 URL이 없는 탐색 범주입니다. 수집 소스 설정이 필요합니다.')
-                    record(result)
+                    return result
+                if s.adapter == 'dale_programs':
+                    records = await dale_listing(fetcher)
+                    items = [new_event(url,title,activity_type=kind,provenance=s.id)
+                             for url,title,kind,badge in records if dale_is_open(badge)]
+                    result.update(state='ok',count=len(items))
+                elif s.adapter == 'cncf_mentoring':
+                    response = await fetcher.github_api(s.url)
+                    response.raise_for_status()
+                    paths = cncf_paths(response.json(),now())
+                    items = [new_event(CNCF_DOCS+path,'CNCF LFX 멘토링',activity_type='project',provenance=s.id)
+                             for path in paths]
+                    result.update(state='ok',method='api',count=len(items))
+                else:
+                    items = None
+                if items is not None:
+                    for event in items:
+                        event.update(discovery_source=s.id,discovery_url=s.url)
+                    yield_items.extend(items)
                     return result
                 r=await (fetcher.github_api(s.url) if s.id.startswith('github_') else fetcher.page(s.url))
                 r.raise_for_status()
@@ -327,8 +354,9 @@ async def discover(fetcher, renderer, record, selected=None):
                 elif status in (401,403,429):message=f'사이트가 자동 접근을 제한했습니다(HTTP {status}). 로그인·차단을 우회하지 않습니다.'
                 elif 'certificate has expired' in message:message='공식 사이트의 TLS 인증서가 만료됐습니다. 사이트 운영자 조치가 필요합니다.'
                 result.update(state='blocked' if blocked else 'error',error=message[:300])
-            result['checked_at']=iso_now()
-            record(result)
+            finally:
+                result['checked_at']=iso_now()
+                record(result)
             return result
     yield_items=[]
     results=await asyncio.gather(*(one(s) for s in SOURCES if selected is None or s.id in selected))

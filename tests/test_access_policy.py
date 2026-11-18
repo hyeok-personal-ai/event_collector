@@ -80,4 +80,7 @@ class RestrictedSourceTests(unittest.TestCase):
                 self.assertFalse(source.enabled, source.id)
         with self.assertRaises(ValueError):
             assert_collection_allowed('https://github.com/brave-people/%44ev-Event/blob/master/README.md')
-        assert_event_collection_allowed({'canonical_url':'https://example.org/a','discovery_source':'eventus'})
+        for source in ('eventus','luma','openai'):
+            with self.assertRaises(ValueError):
+                assert_event_collection_allowed({'canonical_url':'https://example.org/a','discovery_source':source})
+        assert_event_collection_allowed({'canonical_url':'https://example.org/a','discovery_source':'dale_programs'})
