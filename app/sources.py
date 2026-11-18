@@ -282,7 +282,7 @@ async def discover(fetcher, renderer, record, selected=None):
                     result.update(state='missing',method='none',error='구체적인 공개 목록 URL이 없는 탐색 범주입니다. 수집 소스 설정이 필요합니다.')
                     record(result)
                     return result
-                r=await fetcher.page(s.url)
+                r=await (fetcher.github_api(s.url) if s.id.startswith('github_') else fetcher.page(s.url))
                 r.raise_for_status()
                 listing_html,listing_url=r.text,str(r.url)
                 if s.id.startswith('github_'):
@@ -290,7 +290,8 @@ async def discover(fetcher, renderer, record, selected=None):
                 elif s.id=='pytorch':
                     topics=r.json().get('topic_list',{}).get('topics',[])
                     items=[new_event(f'https://discuss.pytorch.kr/t/{t["slug"]}/{t["id"]}',t['title'],provenance=s.id)
-                           for t in topics if re.search(r'밋업|모임|행사|컨퍼런스|PyTorch Day|워크숍|스터디',t['title'],re.I)]
+                           for t in topics if re.search(r'밋업|모임|행사|컨퍼런스|PyTorch Day|워크숍|스터디',t['title'],re.I)
+                           and not re.search(r'\bPyTorch\s+[\d.]+\s+출시\s*공지',t['title'],re.I)]
                 elif s.adapter=='event_page':
                     title=BeautifulSoup(r.text,'html.parser').title
                     if not title or not re.search(r'PyCon|Meta Connect',title.get_text(),re.I):raise ValueError('공식 행사 페이지의 제목을 확인하지 못했습니다.')

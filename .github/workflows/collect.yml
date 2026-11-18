@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   collect:
-    if: github.repository == 'hyeok-personal-ai/event_collector' && github.ref == 'refs/heads/main' && vars.COLLECTION_ENABLED == 'true'
+    if: github.event.repository.private == false && github.repository == 'hyeok-personal-ai/event_collector' && github.ref == 'refs/heads/main' && vars.COLLECTION_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -38,6 +38,7 @@ jobs:
       - name: Collect and persist to D1
         env:
           RADAR_BATCH_KEY: ${{ secrets.RADAR_BATCH_KEY }}
+          RADAR_GITHUB_API_TOKEN: ${{ github.token }}
           FORCE: ${{ inputs.force || false }}
         run: |
           if [ "$FORCE" = "true" ]; then

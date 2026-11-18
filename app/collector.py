@@ -66,13 +66,15 @@ class Fetcher:
     async def close(self):
         await self.client.aclose()
 
-    async def request(self, url, respect_robots=False):
+    async def request(self, url, respect_robots=False, headers=None, allow_redirects=True):
         for _ in range(6):
             url = await public_url(url)
             if respect_robots:
                 await self.allowed(url)
-            async with self.client.stream('GET', url) as r:
+            async with self.client.stream('GET', url, headers=headers) as r:
                 if r.is_redirect:
+                    if not allow_redirects:
+                        raise ValueError('공식 API 응답이 다른 주소로 이동했습니다.')
                     url = urljoin(url, r.headers.get('location', ''))
                     continue
                 chunks, size = [], 0
@@ -107,6 +109,24 @@ class Fetcher:
         parser = self.robots[origin]
         if parser and not parser.can_fetch(USER_AGENT, url):
             raise ValueError('robots.txt에서 자동 수집을 허용하지 않습니다.')
+
+    async def github_api(self, url):
+        """Read the documented GitHub REST API with its own access and rate limits."""
+        parsed = urlsplit(url)
+        issue_path = r'/repos/(?:apache/airflow|explyt/spring-plugin)/issues/\d+(?:/(?:comments|timeline))?'
+        if parsed.scheme != 'https' or parsed.netloc != 'api.github.com' or not (
+            parsed.path == '/search/issues' or re.fullmatch(issue_path, parsed.path)
+        ):
+            raise ValueError('지원하지 않는 GitHub API 주소')
+        assert_collection_allowed(url)
+        headers = {'Accept': 'application/vnd.github+json'}
+        token = os.environ.get('RADAR_GITHUB_API_TOKEN')
+        if token:
+            headers['Authorization'] = 'Bearer ' + token
+        async with self.locks.setdefault(parsed.hostname, asyncio.Lock()):
+            response = await self.request(url, headers=headers, allow_redirects=False)
+            await asyncio.sleep(.6)
+            return response
 
     async def page(self, url):
         url = await public_url(url)
@@ -323,7 +343,7 @@ async def _verify_page(event, fetcher, renderer=None):
             expired=(parse_date(e.get('apply_deadline'),True) or now())<now() if e.get('apply_deadline') else False
             if renderer and not expired and known_dynamic and e['status'] not in ('CLOSED','DEAD','SOLD_OUT'):
                 try:
-                    page=await asyncio.wait_for(renderer.render(e['canonical_url']),timeout=25)
+                    page=await asyncio.wait_for(renderer.render(e['canonical_url']),timeout=55 if sopt_recruit_page(e['canonical_url']) else 25)
                     if page['http_status'] and page['http_status']>=400:
                         raise ValueError(f'브라우저 접속 HTTP {page["http_status"]}')
                     if re.search(r'Just a moment|Checking your browser|Access denied|보안 확인',page.get('title',''),re.I):
@@ -334,7 +354,10 @@ async def _verify_page(event, fetcher, renderer=None):
                     e=recruitment_facts(e,html,page)
                     e.update(verification_method='browser',raw_snapshot=store_raw(html))
                 except Exception as exc:
-                    e['browser_error']=str(exc)[:300]
+                    e['browser_error']=(str(exc) or type(exc).__name__)[:300]
+                    if sopt_recruit_page(e['canonical_url']):
+                        e['last_verified_at']=event.get('last_verified_at')
+                        raise ValueError('SOPT 모집 화면 확인 지연: '+e['browser_error']) from exc
             if e['status'] not in ('CLOSED','SOLD_OUT','DEAD'):
                 e=await check_external(e,html,renderer,fetcher)
             e['failure_count']=0

@@ -20,7 +20,7 @@ def wait_for_club_content(page):
             Array.from(document.querySelectorAll('h1')).some(el =>
               el.getClientRects().length && getComputedStyle(el).visibility!=='hidden' &&
               el.innerText.trim().length>0);
-        }''',timeout=8000)
+        }''',timeout=16000)
     except BrowserTimeout:
         raise ValueError('SOPT 공식 모집 페이지의 로딩이 끝나지 않았습니다. 모집 0건으로 확정하지 않고 다음 배치에서 재확인합니다.') from None
 

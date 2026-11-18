@@ -32,7 +32,7 @@ class ClubPages(unittest.TestCase):
             def wait_for_function(self,script,timeout):self.calls.append((script,timeout))
         page=Page(URL);wait_for_club_content(page)
         self.assertEqual(len(page.calls),1)
-        self.assertEqual(page.calls[0][1],8000)
+        self.assertEqual(page.calls[0][1],16000)
         self.assertIn('페이지 로딩 중입니다',page.calls[0][0])
         for url in ['https://recruit.sopt.org.evil.example/','https://recruit.sopt.org/auth','https://www.sopt.org/']:
             page=Page(url);wait_for_club_content(page);self.assertEqual(page.calls,[])

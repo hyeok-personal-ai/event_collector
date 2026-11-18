@@ -186,11 +186,15 @@ async def verify_github(event,fetcher):
     if not match:return None
     owner,repo,num=match.groups()
     base=f'https://api.github.com/repos/{owner}/{repo}/issues/{num}'
+    endpoint=fetcher.github_api if (owner,repo) in {('apache','airflow'),('explyt','spring-plugin')} else fetcher.page
     async def get(url):
-        r=await fetcher.page(url);r.raise_for_status();return r.json(),r.headers
+        r=await endpoint(url);r.raise_for_status();return r.json(),r.headers
     issue,_=await get(base)
-    comments,ch=await get(base+'/comments?per_page=100')
-    timeline,th=await get(base+'/timeline?per_page=100')
+    comments,ch=([],{})
+    timeline,th=([],{})
+    if issue.get('state')=='open' and not issue.get('assignees'):
+        comments,ch=await get(base+'/comments?per_page=100')
+        timeline,th=await get(base+'/timeline?per_page=100')
     status,evidence=github_decision(issue,comments,timeline)
     if 'rel="next"' in ch.get('link','') or 'rel="next"' in th.get('link',''):
         status,evidence='CHECK_REQUIRED','댓글/타임라인이 100개를 초과해 전체 선점 여부를 확인하지 못했습니다.'
