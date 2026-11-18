@@ -159,6 +159,10 @@ RETIRED.update({'onoffmix': ('제14조 제8항 제7호의 사전 승낙 없는 �
 SOURCES=[replace(s,**REPAIRS.get(s.id,{})) for s in SOURCES]
 SOURCES=[replace(s,enabled=False,note=RETIRED[s.id][0],replacements=RETIRED[s.id][1]) if s.id in RETIRED else s for s in SOURCES]
 SOURCES += [
+    Source('lf_calendar','Linux Foundation 공식 행사','개발자 커뮤니티',
+           'https://events.linuxfoundation.org/about/calendar/',
+           r'events\.linuxfoundation\.org/[a-z0-9]+(?:-[a-z0-9]+)*/?$',adapter='lf_calendar',
+           note='공식 일정의 자체 행사 원문만 읽고 공식 등록 버튼으로 신청 상태를 확인합니다. 외부 주최자·사진·본문은 제외합니다.'),
     Source('dale_programs','달레 스터디 공식 프로그램','스터디·프로젝트',DALE_URL,
            r'dalestudy\.com/programs/[a-z0-9-]+$',adapter='dale_programs',
            note='공식 사이트 소스 MIT 라이선스 및 검색 색인 허용. 공개 목록의 프로그램명·모집 표시·링크만 수집합니다.'),
@@ -199,7 +203,8 @@ def sideproject_activity(title):
 def extract_links(html, base_url, source):
     soup=BeautifulSoup(html,'html.parser')
     found={}
-    for a in soup.select('a[href]'):
+    selector = 'h5 a[href]' if source.adapter == 'lf_calendar' else 'a[href]'
+    for a in soup.select(selector):
         if source.id=='openai' and 'event-link' not in a.get('class',[]):continue
         href=urljoin(base_url,a['href'])
         heading=a.select_one('h1,h2,h3,h4,[class*="title"],[data-testid*="title"]')
@@ -236,6 +241,8 @@ def extract_links(html, base_url, source):
         except ValueError:
             pass
     # Links in SSR JSON are source records, never executed JavaScript.
+    if source.adapter == 'lf_calendar':
+        return list(found.values())[:35]
     for script in soup.select('script#__NEXT_DATA__,script[type="application/ld+json"]'):
         if source.id=='openai':continue
         try:

@@ -326,7 +326,7 @@ async def _verify_page(event, fetcher, renderer=None):
         e['needs_recheck']=False
     raw=''
     try:
-        from .official_programs import verify_program
+        from .official_programs import lf_registration, verify_program
         program = await verify_program(e, fetcher)
         if program is not None:
             return program, ''
@@ -371,7 +371,10 @@ async def _verify_page(event, fetcher, renderer=None):
                         e['last_verified_at']=event.get('last_verified_at')
                         raise ValueError('SOPT 모집 화면 확인 지연: '+e['browser_error']) from exc
             if e['status'] not in ('CLOSED','SOLD_OUT','DEAD'):
-                e=await check_external(e,html,renderer,fetcher)
+                if e.get('discovery_source') == 'lf_calendar':
+                    e=await lf_registration(e,fetcher)
+                else:
+                    e=await check_external(e,html,renderer,fetcher)
             e['failure_count']=0
             e['error_kind']=None
             deferred='한도에 도달' in e.get('browser_error','') or any('한도에 도달' in c.get('evidence','') for c in e.get('application_checks',[]))

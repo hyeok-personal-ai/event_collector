@@ -119,3 +119,37 @@ def program_verdict(event, title, kind, status, evidence, verification_url, appl
     else:
         result.pop('recruitment_basis', None)
     return result
+
+
+async def lf_registration(event, fetcher):
+    url = event['canonical_url']
+    if not re.fullmatch(r'https://events\.linuxfoundation\.org/[a-z0-9]+(?:-[a-z0-9]+)*', url):
+        return event
+    registration = url + '/register/'
+    response = await fetcher.page(registration)
+    if response.status_code == 404 or str(response.url).rstrip('/') != registration.rstrip('/'):
+        return event
+    response.raise_for_status()
+    links = BeautifulSoup(response.text, 'html.parser').select('main a[href]')
+    statuses = set()
+    for link in links:
+        destination = urlsplit(link['href'])
+        if destination.scheme != 'https' or destination.netloc != 'register.linuxfoundation.org' or destination.path in ('', '/'):
+            continue
+        if link.get('aria-disabled') == 'true' or link.has_attr('disabled'):
+            continue
+        label = link.get_text(' ', strip=True).strip('!').lower()
+        if label == 'register now':
+            statuses.add('OPEN')
+        elif label in ('registration is sold out', 'sold out'):
+            statuses.add('SOLD_OUT')
+        elif label in ('registration is closed', 'registration closed'):
+            statuses.add('CLOSED')
+    if len(statuses) == 1:
+        status = statuses.pop()
+        event.update(status=status, application_url=registration, verification_url=registration,
+                     evidence='Linux Foundation 공식 등록 페이지에서 ' + {'OPEN':'신청 버튼', 'SOLD_OUT':'매진 표시','CLOSED':'접수 마감 표시'}[status] + ' 확인')
+        event.pop('recruitment_basis', None)
+        if status == 'OPEN':
+            event['recruitment_basis'] = 'listing'
+    return event

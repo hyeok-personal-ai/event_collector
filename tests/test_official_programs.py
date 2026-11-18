@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 
-from app.official_programs import CNCF_DOCS, CNCF_TREE, DALE_URL, cncf_window, verify_program
-from app.sources import discover
+from app.official_programs import CNCF_DOCS, CNCF_TREE, DALE_URL, cncf_window, lf_registration, verify_program
+from app.sources import SOURCES, discover, extract_links
 
 
 TERM = 'programs/lfx-mentorship/2027/01-Mar-May/README.md'
@@ -13,6 +13,22 @@ WINDOW = '| Mentee Applications Open | Wed, Feb 3, 00:00 UTC – Tue, Feb 16, 23
 
 
 class OfficialProgramTests(unittest.IsolatedAsyncioTestCase):
+    async def test_linux_foundation_requires_official_calendar_and_registration_links(self):
+        source = next(s for s in SOURCES if s.id == 'lf_calendar')
+        html = ('<h5><a href="/open-source-summit-japan/">Open Source Summit Japan</a></h5>'
+                '<h5><a href="https://another.example/meetup">External event</a></h5>'
+                '<a href="/sponsorship/">Sponsorship link</a>')
+        event, = extract_links(html, source.url, source)
+        page = event['canonical_url'] + '/register/'
+        fetcher = AsyncMock()
+        for label, status in [('Register Now!', 'OPEN'), ('Registration is Sold Out', 'SOLD_OUT')]:
+            body = f'<main><a href="#register">Register Now!</a><a href="https://register.linuxfoundation.org/event">{label}</a></main>'
+            fetcher.page.return_value = httpx.Response(200, text=body, request=httpx.Request('GET', page))
+            self.assertEqual((await lf_registration(dict(event), fetcher))['status'], status)
+        body = '<main><a href="#register">Register Now!</a></main>'
+        fetcher.page.return_value = httpx.Response(200, text=body, request=httpx.Request('GET', page))
+        self.assertEqual((await lf_registration(event, fetcher))['status'], 'CHECK_REQUIRED')
+
     async def test_official_date_window_uses_utc(self):
         fetcher = AsyncMock()
         fetcher.github_api.return_value = httpx.Response(200, text=WINDOW, request=httpx.Request('GET', CNCF_TREE))
