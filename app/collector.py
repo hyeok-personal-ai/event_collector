@@ -204,6 +204,11 @@ def parse_page(html, url, previous, observation=None):
                 day=datetime.strptime(date_match[1],'%B %d, %Y').date().isoformat()
                 e['start_at']=day;e['end_at']=day
             except ValueError:pass
+    parsed_url = urlsplit(url)
+    if parsed_url.hostname == 'pytorch.org' and parsed_url.path.rstrip('/') == '/event/pytorch-2-15-release-live-qa':
+        event_date = soup.select_one('abbr.tribe-events-start-date[title]')
+        if event_date and re.fullmatch(r'\d{4}-\d{2}-\d{2}', event_date['title']) and parse_date(event_date['title']):
+            e.update(start_at=event_date['title'], end_at=event_date['title'])
     if len(e['title']) > 90 and previous.get('title') and previous['title'] != urlsplit(url).hostname:
         e['title'] = previous['title']
     linkareer_detail=(urlsplit(url).hostname or '').removeprefix('www.')=='linkareer.com' and bool(re.fullmatch(r'/activity/\d+/?',urlsplit(url).path))

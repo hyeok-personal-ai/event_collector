@@ -1,5 +1,15 @@
 [
   {
+    "original_url": "https://discuss.pytorch.kr/t/pytorch-2-15/12351",
+    "url": "https://pytorch.org/event/pytorch-2-15-release-live-qa/",
+    "name": "PyTorch 2.15 Release Live Q&A",
+    "provider": "PyTorch Foundation 공식 행사 페이지",
+    "mode": "alternate",
+    "markers": ["pytorch 2.15 release live q&a"],
+    "informational_only": true,
+    "reason": "포럼 공지가 직접 연결한 동일 행사의 PyTorch Foundation 안내입니다. 행사일을 공식 원문에서 확인합니다."
+  },
+  {
     "original_url": "https://cday2026.awskr.org/",
     "url": "https://event-us.kr/awskrug/event/137627",
     "name": "AWS Community Day Seoul 2026",
