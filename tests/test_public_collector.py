@@ -74,6 +74,7 @@ class PublicCollectorTests(unittest.TestCase):
 
     def test_filtered_listing_finds_candidates_without_claiming_recruitment(self):
         import httpx
+        from dataclasses import replace
         from urllib.parse import parse_qs,urlsplit
         from app.sources import discover
         class Fetcher:
@@ -81,7 +82,9 @@ class PublicCollectorTests(unittest.TestCase):
                 query=parse_qs(urlsplit(url).query)
                 html='<a href="/activity/12">AI 스터디 모집</a><a href="/activity/12"><h5>AI 스터디 모집</h5></a><a href="/activity/13">문화 교류 서포터즈</a>' if query.get('filterBy_interestIDs')==['13'] else '<a href="/activity/13">문화 교류 서포터즈</a>'
                 return httpx.Response(200,text=html,headers={'content-type':'text/html'},request=httpx.Request('GET',url))
-        items,results=asyncio.run(discover(Fetcher(),None,lambda r:None,selected={'linkareer'}))
+        source=replace(next(s for s in SOURCES if s.id=='linkareer'),enabled=True)
+        with patch('app.sources.SOURCES',[source]):
+            items,results=asyncio.run(discover(Fetcher(),None,lambda r:None,selected={'linkareer'}))
         self.assertEqual(len(items),1)
         self.assertEqual(items[0]['status'],'CHECK_REQUIRED')
         self.assertEqual(items[0]['discovery_source'],'linkareer')
@@ -90,14 +93,18 @@ class PublicCollectorTests(unittest.TestCase):
 
     def test_empty_keyword_selection_is_distinct_from_missing_listing(self):
         import httpx
+        from dataclasses import replace
         from app.sources import discover
         class Fetcher:
             def __init__(self,html):self.html=html
             async def page(self,url):return httpx.Response(200,text=self.html,request=httpx.Request('GET',url))
-        _,results=asyncio.run(discover(Fetcher('<a href="/activity/13">문화 교류 서포터즈</a>'),None,lambda r:None,selected={'linkareer'}))
+        source=replace(next(s for s in SOURCES if s.id=='linkareer'),enabled=True)
+        with patch('app.sources.SOURCES',[source]):
+            _,results=asyncio.run(discover(Fetcher('<a href="/activity/13">문화 교류 서포터즈</a>'),None,lambda r:None,selected={'linkareer'}))
         self.assertEqual(results[0]['state'],'empty')
         self.assertIn('공개 목록 1개를 읽었으나',results[0]['error'])
-        _,results=asyncio.run(discover(Fetcher('<p>Loading...</p>'),None,lambda r:None,selected={'linkareer'}))
+        with patch('app.sources.SOURCES',[source]):
+            _,results=asyncio.run(discover(Fetcher('<p>Loading...</p>'),None,lambda r:None,selected={'linkareer'}))
         self.assertIn('추출하지 못했습니다',results[0]['error'])
 
     def test_catalog_replacements_are_active(self):

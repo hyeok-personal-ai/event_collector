@@ -11,6 +11,7 @@ from .importers import parse_dev_event
 from .collector import DEV_EVENT_URL, json_nodes
 from .access_policy import assert_collection_allowed
 from .official_programs import CNCF_DOCS, CNCF_PATH, CNCF_TREE, DALE_URL, cncf_paths, dale_is_open, dale_listing
+from .open_calls import FOSDEM_CALL, FOSDEM_URL, WIKIMEDIA_URL, discover_open_calls
 
 @dataclass(frozen=True)
 class Source:
@@ -107,6 +108,7 @@ REPAIRS = {
     'jumpit':dict(note='텍스트 없는 이미지 배너도 행사 상세 링크를 추출하고 원문에서 제목·접수를 확인합니다.'),
 }
 RETIRED = {
+    'linkareer':('2026-08-12 약관에 비정상적 방식의 크롤링·스크래핑 자료 수집 제한이 명시되어 있습니다. 정기 수집 허가를 확인할 때까지 보류합니다.',()),
     'eventus':('이용약관 제13조의 사전 승낙 없는 비영리 포함 복제·제3자 제공 제한을 확인했습니다. 허가 전 목록·개별 행사 자동 수집을 보류합니다.',()),
     'luma':('공식 API는 권한이 있는 Luma Plus 캘린더의 키가 필요합니다. Discover·개별 행사 자동 색인 허가를 확인할 때까지 보류합니다.',()),
     'openai':('공식 커뮤니티 행사의 현재 목록 경로가 Luma입니다. 권한 있는 공식 수집 경로를 확보할 때까지 보류합니다.',()),
@@ -159,6 +161,12 @@ RETIRED.update({'onoffmix': ('제14조 제8항 제7호의 사전 승낙 없는 �
 SOURCES=[replace(s,**REPAIRS.get(s.id,{})) for s in SOURCES]
 SOURCES=[replace(s,enabled=False,note=RETIRED[s.id][0],replacements=RETIRED[s.id][1]) if s.id in RETIRED else s for s in SOURCES]
 SOURCES += [
+    Source('fosdem_calls','FOSDEM 발표·워크숍 모집','개발자 커뮤니티',FOSDEM_URL,
+           FOSDEM_CALL.removeprefix('https://')+'$',adapter='open_calls',
+           note='공식 일정 및 공고의 CC BY 4.0 표시를 확인해 발표·워크숍 모집 분야, 마감일, 원문 링크만 색인합니다.'),
+    Source('wikimedia_hackathon','Wikimedia Hackathon 참가 모집','해커톤·공모전',WIKIMEDIA_URL,
+           r'mediawiki\.org/wiki/Wikimedia_Hackathon_2027/Participants$',adapter='open_calls',
+           note='공식 참가 안내의 CC BY-SA 4.0 텍스트에서 일반 참가 모집 사실과 원문 링크를 확인합니다. 장학금·스폰서 신청은 제외합니다.'),
     Source('lf_calendar','Linux Foundation 공식 행사','개발자 커뮤니티',
            'https://events.linuxfoundation.org/about/calendar/',
            r'events\.linuxfoundation\.org/[a-z0-9]+(?:-[a-z0-9]+)*/?$',adapter='lf_calendar',
@@ -297,7 +305,10 @@ async def discover(fetcher, renderer, record, selected=None):
                 if not s.url:
                     result.update(state='missing',method='none',error='구체적인 공개 목록 URL이 없는 탐색 범주입니다. 수집 소스 설정이 필요합니다.')
                     return result
-                if s.adapter == 'dale_programs':
+                if s.adapter == 'open_calls':
+                    items = await discover_open_calls(s.id, fetcher)
+                    result.update(state='ok' if items else 'empty',count=len(items))
+                elif s.adapter == 'dale_programs':
                     records = await dale_listing(fetcher)
                     items = [new_event(url,title,activity_type=kind,provenance=s.id)
                              for url,title,kind,badge in records if dale_is_open(badge)]

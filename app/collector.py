@@ -327,7 +327,8 @@ async def _verify_page(event, fetcher, renderer=None):
     raw=''
     try:
         from .official_programs import lf_registration, verify_program
-        program = await verify_program(e, fetcher)
+        from .open_calls import verify_open_call
+        program = await verify_open_call(e, fetcher) or await verify_program(e, fetcher)
         if program is not None:
             return program, ''
         from .verifiers import verify_github, site_markers, check_external

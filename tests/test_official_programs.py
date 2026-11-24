@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 
 from app.official_programs import CNCF_DOCS, CNCF_TREE, DALE_URL, cncf_window, lf_registration, verify_program
+from app.open_calls import WIKIMEDIA_URL, verify_open_call
 from app.sources import SOURCES, discover, extract_links
 
 
@@ -13,6 +14,16 @@ WINDOW = '| Mentee Applications Open | Wed, Feb 3, 00:00 UTC – Tue, Feb 16, 23
 
 
 class OfficialProgramTests(unittest.IsolatedAsyncioTestCase):
+    async def test_wikimedia_distinguishes_upcoming_registration_from_scholarship(self):
+        fetcher = AsyncMock()
+        page = ('<div class="mw-parser-output"><div class="mw-heading"><h2 id="Registration">Registration</h2></div>'
+                '<p>General registration will open in mid-January 2027.</p>'
+                '<p>Scholarship registration is now open.</p></div>'
+                '<li id="footer-info-copyright"><a href="https://creativecommons.org/licenses/by-sa/4.0/">CC</a></li>')
+        fetcher.page.return_value = httpx.Response(200, text=page, request=httpx.Request('GET', WIKIMEDIA_URL))
+        outcome = await verify_open_call({'canonical_url': WIKIMEDIA_URL}, fetcher)
+        self.assertEqual(outcome['status'], 'CHECK_REQUIRED')
+
     async def test_linux_foundation_requires_official_calendar_and_registration_links(self):
         source = next(s for s in SOURCES if s.id == 'lf_calendar')
         html = ('<h5><a href="/open-source-summit-japan/">Open Source Summit Japan</a></h5>'
