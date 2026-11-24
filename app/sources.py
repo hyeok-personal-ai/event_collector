@@ -12,6 +12,7 @@ from .collector import DEV_EVENT_URL, json_nodes
 from .access_policy import assert_collection_allowed
 from .official_programs import CNCF_DOCS, CNCF_PATH, CNCF_TREE, DALE_URL, cncf_paths, dale_is_open, dale_listing
 from .open_calls import FOSDEM_CALL, FOSDEM_URL, WIKIMEDIA_URL, discover_open_calls
+from .contest_sources import HACKALENDAR_URL, MOIS_URL, hackalendar_candidates, mois_candidates
 
 @dataclass(frozen=True)
 class Source:
@@ -161,6 +162,10 @@ RETIRED.update({'onoffmix': ('제14조 제8항 제7호의 사전 승낙 없는 �
 SOURCES=[replace(s,**REPAIRS.get(s.id,{})) for s in SOURCES]
 SOURCES=[replace(s,enabled=False,note=RETIRED[s.id][0],replacements=RETIRED[s.id][1]) if s.id in RETIRED else s for s in SOURCES]
 SOURCES += [
+    Source('hackalendar','Hackalendar · 해외 해커톤 API','해커톤·공모전',HACKALENDAR_URL,'',adapter='hackalendar',
+           note='공개 API 이용 안내에 따라 행사명·시각과 주최자 등록 링크를 확인합니다. 등록 페이지의 조건을 별도로 적용합니다.'),
+    Source('mois_contests','행정안전부 · 기술 경진대회','해커톤·공모전',MOIS_URL,'',adapter='mois_contests',
+           note='공공누리 1유형이 게시물에 직접 표시된 기술 경진대회 보도자료만 대상으로 합니다.'),
     Source('fosdem_calls','FOSDEM 발표·워크숍 모집','개발자 커뮤니티',FOSDEM_URL,
            FOSDEM_CALL.removeprefix('https://')+'$',adapter='open_calls',
            note='공식 일정 및 공고의 CC BY 4.0 표시를 확인해 발표·워크숍 모집 분야, 마감일, 원문 링크만 색인합니다.'),
@@ -305,7 +310,11 @@ async def discover(fetcher, renderer, record, selected=None):
                 if not s.url:
                     result.update(state='missing',method='none',error='구체적인 공개 목록 URL이 없는 탐색 범주입니다. 수집 소스 설정이 필요합니다.')
                     return result
-                if s.adapter == 'open_calls':
+                if s.adapter in ('hackalendar', 'mois_contests'):
+                    items = await (hackalendar_candidates(fetcher) if s.adapter == 'hackalendar' else mois_candidates(fetcher))
+                    result.update(state='ok' if items else 'empty',count=len(items),
+                                  method='api' if s.adapter=='hackalendar' else 'http')
+                elif s.adapter == 'open_calls':
                     items = await discover_open_calls(s.id, fetcher)
                     result.update(state='ok' if items else 'empty',count=len(items))
                 elif s.adapter == 'dale_programs':

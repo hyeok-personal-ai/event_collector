@@ -328,6 +328,9 @@ async def _verify_page(event, fetcher, renderer=None):
     try:
         from .official_programs import lf_registration, verify_program
         from .open_calls import verify_open_call
+        if e.get('discovery_source') == 'mois_contests':
+            from .contest_sources import verify_mois
+            return await verify_mois(e, fetcher), ''
         program = await verify_open_call(e, fetcher) or await verify_program(e, fetcher)
         if program is not None:
             return program, ''
@@ -380,6 +383,8 @@ async def _verify_page(event, fetcher, renderer=None):
             e['error_kind']=None
             deferred='한도에 도달' in e.get('browser_error','') or any('한도에 도달' in c.get('evidence','') for c in e.get('application_checks',[]))
             e['verification_version']=1 if deferred else VERSION
+            if e.get('discovery_source') == 'hackalendar':
+                e['verification_url'] = str(response.url)
     except (httpx.HTTPError, ValueError, OSError, KeyError, TypeError) as exc:
         e.update(status='CHECK_REQUIRED', evidence=str(exc) or type(exc).__name__,
                  failure_count=event.get('failure_count',0)+1,error_kind='access' if 'robots' in str(exc) else 'network')
