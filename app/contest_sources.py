@@ -1,15 +1,18 @@
 """Discover contests through a reusable feed and first-party public notices."""
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
 from .access_policy import assert_collection_allowed
-from .core import canonical, new_event, now, parse_date
+from .core import KST, canonical, new_event, now, parse_date
 from .official_programs import program_verdict
 
 HACKALENDAR_URL = 'https://hackalendar.com/api/events?limit=40'
+SEOUL_PRESS_DATA = 'https://data.seoul.go.kr/dataList/OA-22195/S/1/datasetView.do'
+SEOUL_HACKATHON = 'https://www.startup-plus.kr/project/PRJ007715'
+SEOUL_HACKATHON_NAME = '2026 서울 야간경제 활성화 해커톤 (Dopamine Seoul 24)'
 MOIS_ROOT = 'https://www.mois.go.kr'
 MOIS_LIST = MOIS_ROOT + '/frt/bbs/type010/commonSelectBoardList.do'
 MOIS_ARTICLE = '/frt/bbs/type010/commonSelectBoardArticle.do'
@@ -17,6 +20,39 @@ MOIS_BOARD = 'BBSMSTR_000000000008'
 MOIS_URL = MOIS_LIST + '?' + urlencode({'bbsId': MOIS_BOARD, 'searchCnd': '0', 'searchWrd': '경진대회'})
 TECH_CONTEST = re.compile(r'해커톤|해킹|인공지능|\bAI\b|소프트웨어|공공데이터|로봇|빅데이터', re.I)
 RESULT_NOTICE = re.compile(r'수상작|결과\s*발표|선정\s*결과|성황리|시상식|왕중왕전|몰렸다')
+
+
+async def seoul_hackathon_candidate(fetcher):
+    response = await fetcher.page(SEOUL_PRESS_DATA)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, 'html.parser')
+    licence = soup.select_one('.ccl-txt img[src*="opentype04"]')
+    if not licence or '공공누리 4유형' not in licence.parent.get_text(' ', strip=True):
+        raise ValueError('서울시 보도자료 데이터의 공공누리 제4유형 표시를 확인하지 못했습니다.')
+    return new_event(SEOUL_HACKATHON, SEOUL_HACKATHON_NAME, activity_type='hackathon', country_code='KR',
+                     location='서울', organizer='서울특별시 · 서울경제진흥원')
+
+
+async def verify_seoul_hackathon(event, fetcher):
+    response = await fetcher.page(SEOUL_HACKATHON)
+    response.raise_for_status()
+    if canonical(str(response.url)) != SEOUL_HACKATHON:
+        raise ValueError('서울경제진흥원 공식 접수 주소가 달라졌습니다.')
+    soup = BeautifulSoup(response.text, 'html.parser')
+    receipt = soup.select_one('[data-bind-type="receiptDate"]')
+    guide = soup.select_one('[data-guide]')
+    published = BeautifulSoup(guide['data-guide'], 'html.parser') if guide else soup
+    match = re.fullmatch(r'(20\d{2}-\d\d-\d\d \d\d:\d\d)\s*~\s*(20\d{2}-\d\d-\d\d \d\d:\d\d)',
+                         receipt.get_text(' ', strip=True) if receipt else '')
+    if not match or 'Dopamine Seoul 24' not in published.get_text(' ', strip=True):
+        raise ValueError('서울경제진흥원 공식 공고에서 같은 행사와 접수 일시를 확인하지 못했습니다.')
+    start, end = (datetime.fromisoformat(value).replace(tzinfo=KST) for value in match.groups())
+    if start >= end:
+        raise ValueError('공식 공고의 접수 시작과 마감 일시가 일치하지 않습니다.')
+    status = 'CLOSED' if now() >= end else 'OPEN' if now() >= start else 'CHECK_REQUIRED'
+    return program_verdict(event, SEOUL_HACKATHON_NAME, 'hackathon', status,
+                           '서울경제진흥원 공식 접수 기간 확인', SEOUL_HACKATHON,
+                           apply_deadline=end.isoformat())
 
 
 async def hackalendar_candidates(fetcher):

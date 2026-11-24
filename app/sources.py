@@ -12,7 +12,7 @@ from .collector import DEV_EVENT_URL, json_nodes
 from .access_policy import assert_collection_allowed
 from .official_programs import CNCF_DOCS, CNCF_PATH, CNCF_TREE, DALE_URL, cncf_paths, dale_is_open, dale_listing
 from .open_calls import FOSDEM_CALL, FOSDEM_URL, WIKIMEDIA_URL, discover_open_calls
-from .contest_sources import HACKALENDAR_URL, MOIS_URL, hackalendar_candidates, mois_candidates
+from .contest_sources import HACKALENDAR_URL, MOIS_URL, SEOUL_PRESS_DATA, hackalendar_candidates, mois_candidates, seoul_hackathon_candidate
 
 @dataclass(frozen=True)
 class Source:
@@ -162,6 +162,8 @@ RETIRED.update({'onoffmix': ('제14조 제8항 제7호의 사전 승낙 없는 �
 SOURCES=[replace(s,**REPAIRS.get(s.id,{})) for s in SOURCES]
 SOURCES=[replace(s,enabled=False,note=RETIRED[s.id][0],replacements=RETIRED[s.id][1]) if s.id in RETIRED else s for s in SOURCES]
 SOURCES += [
+    Source('seoul_night_hackathon','서울시 · 야간경제 활성화 해커톤','해커톤·공모전',SEOUL_PRESS_DATA,'',
+           adapter='seoul_night_hackathon',note='서울시 보도자료 데이터에 등록된 단일 행사입니다. 행사명·접수 일시·공식 링크만 표시합니다.'),
     Source('hackalendar','Hackalendar · 해외 해커톤 API','해커톤·공모전',HACKALENDAR_URL,'',adapter='hackalendar',
            note='공개 API 이용 안내에 따라 행사명·시각과 주최자 등록 링크를 확인합니다. 등록 페이지의 조건을 별도로 적용합니다.'),
     Source('mois_contests','행정안전부 · 기술 경진대회','해커톤·공모전',MOIS_URL,'',adapter='mois_contests',
@@ -310,7 +312,10 @@ async def discover(fetcher, renderer, record, selected=None):
                 if not s.url:
                     result.update(state='missing',method='none',error='구체적인 공개 목록 URL이 없는 탐색 범주입니다. 수집 소스 설정이 필요합니다.')
                     return result
-                if s.adapter in ('hackalendar', 'mois_contests'):
+                if s.adapter == 'seoul_night_hackathon':
+                    items = [await seoul_hackathon_candidate(fetcher)]
+                    result.update(state='ok',count=len(items))
+                elif s.adapter in ('hackalendar', 'mois_contests'):
                     items = await (hackalendar_candidates(fetcher) if s.adapter == 'hackalendar' else mois_candidates(fetcher))
                     result.update(state='ok' if items else 'empty',count=len(items),
                                   method='api' if s.adapter=='hackalendar' else 'http')

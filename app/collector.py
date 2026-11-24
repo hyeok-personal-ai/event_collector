@@ -328,6 +328,9 @@ async def _verify_page(event, fetcher, renderer=None):
     try:
         from .official_programs import lf_registration, verify_program
         from .open_calls import verify_open_call
+        if e.get('discovery_source') == 'seoul_night_hackathon':
+            from .contest_sources import verify_seoul_hackathon
+            return await verify_seoul_hackathon(e, fetcher), ''
         if e.get('discovery_source') == 'mois_contests':
             from .contest_sources import verify_mois
             return await verify_mois(e, fetcher), ''
